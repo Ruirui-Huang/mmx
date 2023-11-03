@@ -1,15 +1,11 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import torch
-from mmdet.models.detectors.single_stage import SingleStageDetector
-from mmdet.utils import ConfigType, OptConfigType, OptMultiConfig
-from mmengine.dist import get_world_size
-from mmengine.logging import print_log
-
-from mmyolo.registry import MODELS
+from mmyolo.models.detectors import YOLODetector as BaseYOLODetector
+from mmseg.models.segmentors import EncoderDecoder as BaseEncoderDecoder
+from mmx.registry import MODELS
 
 
 @MODELS.register_module()
-class YOLODetector(SingleStageDetector):
+class YOLODetector(BaseYOLODetector):
     r"""Implementation of YOLO Series
 
     Args:
@@ -29,25 +25,35 @@ class YOLODetector(SingleStageDetector):
         use_syncbn (bool): whether to use SyncBatchNorm. Defaults to True.
     """
 
-    def __init__(self,
-                 backbone: ConfigType,
-                 neck: ConfigType,
-                 bbox_head: ConfigType,
-                 train_cfg: OptConfigType = None,
-                 test_cfg: OptConfigType = None,
-                 data_preprocessor: OptConfigType = None,
-                 init_cfg: OptMultiConfig = None,
-                 use_syncbn: bool = True):
-        super().__init__(
-            backbone=backbone,
-            neck=neck,
-            bbox_head=bbox_head,
-            train_cfg=train_cfg,
-            test_cfg=test_cfg,
-            data_preprocessor=data_preprocessor,
-            init_cfg=init_cfg)
+    def forward_dummy(self, batch_inputs, batch_data_samples=None):
+        """
+        Args:
+            batch_inputs (Tensor): Inputs with shape (N, C, H, W)
+        Returns:
+            tuple[list]: A tuple of features from "bbox_head" forward
+        """
+        x = self.extract_feat(batch_inputs)
+        return self.bbox_head._forward(x)
+        
+@MODELS.register_module()
+class EncoderDecoder(BaseEncoderDecoder):
+     def forward_dummy(self, inputs):
+        """
+        Args:
+            inputs (Tensor): Inputs with shape (N, C, H, W).
+        Returns:
+            Tensor: Forward output of model without any post-processes.
+        """
+        x = self.extract_feat(inputs)
+        return self.decode_head.forward(x)
 
-        # TODO： Waiting for mmengine support
-        if use_syncbn and get_world_size() > 1:
-            torch.nn.SyncBatchNorm.convert_sync_batchnorm(self)
-            print_log('Using SyncBatchNorm()', 'current')
+    def forward_particular(self, inputs):
+        batch_img_metas = [
+            dict(
+                ori_shape=inputs.shape[2:],
+                img_shape=inputs.shape[2:],
+                pad_shape=inputs.shape[2:],
+                padding_size=[0, 0, 0, 0]
+            )
+        ] * inputs.shape[0]
+        return self.decode_head(inputs, batch_img_metas)
