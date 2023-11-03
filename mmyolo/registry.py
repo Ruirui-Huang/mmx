@@ -31,73 +31,67 @@ from mmengine.registry import Registry
 
 # manage all kinds of runners like `EpochBasedRunner` and `IterBasedRunner`
 RUNNERS = Registry(
-    'runner', parent=MMENGINE_RUNNERS, locations=['mmyolo.engine'])
+    'runner', parent=MMENGINE_RUNNERS)
 # manage runner constructors that define how to initialize runners
 RUNNER_CONSTRUCTORS = Registry(
     'runner constructor',
-    parent=MMENGINE_RUNNER_CONSTRUCTORS,
-    locations=['mmyolo.engine'])
+    parent=MMENGINE_RUNNER_CONSTRUCTORS)
 # manage all kinds of loops like `EpochBasedTrainLoop`
-LOOPS = Registry('loop', parent=MMENGINE_LOOPS, locations=['mmyolo.engine'])
+LOOPS = Registry('loop', parent=MMENGINE_LOOPS)
 # manage all kinds of hooks like `CheckpointHook`
 HOOKS = Registry(
-    'hook', parent=MMENGINE_HOOKS, locations=['mmyolo.engine.hooks'])
+    'hook', parent=MMENGINE_HOOKS, locations=['mmx.hooks'])
 
 # manage data-related modules
 DATASETS = Registry(
-    'dataset', parent=MMENGINE_DATASETS, locations=['mmyolo.datasets'])
+    'dataset', parent=MMENGINE_DATASETS, locations=['mmx.datasets'])
 DATA_SAMPLERS = Registry(
     'data sampler',
-    parent=MMENGINE_DATA_SAMPLERS,
-    locations=['mmyolo.datasets'])
+    parent=MMENGINE_DATA_SAMPLERS)
 TRANSFORMS = Registry(
     'transform',
     parent=MMENGINE_TRANSFORMS,
-    locations=['mmyolo.datasets.transforms'])
+    locations=['mmx.transforms'])
 
 # manage all kinds of modules inheriting `nn.Module`
-MODELS = Registry('model', parent=MMENGINE_MODELS, locations=['mmyolo.models'])
+MODELS = Registry('model', parent=MMENGINE_MODELS, locations=['mmx.models'])
 # manage all kinds of model wrappers like 'MMDistributedDataParallel'
 MODEL_WRAPPERS = Registry(
     'model_wrapper',
     parent=MMENGINE_MODEL_WRAPPERS,
-    locations=['mmyolo.models'])
+    locations=['mmx.models'])
 # manage all kinds of weight initialization modules like `Uniform`
 WEIGHT_INITIALIZERS = Registry(
     'weight initializer',
     parent=MMENGINE_WEIGHT_INITIALIZERS,
-    locations=['mmyolo.models'])
+    locations=['mmx.models'])
 
 # manage all kinds of optimizers like `SGD` and `Adam`
 OPTIMIZERS = Registry(
     'optimizer',
-    parent=MMENGINE_OPTIMIZERS,
-    locations=['mmyolo.engine.optimizers'])
+    parent=MMENGINE_OPTIMIZERS)
 OPTIM_WRAPPERS = Registry(
     'optim_wrapper',
-    parent=MMENGINE_OPTIM_WRAPPERS,
-    locations=['mmyolo.engine.optimizers'])
+    parent=MMENGINE_OPTIM_WRAPPERS)
 # manage constructors that customize the optimization hyperparameters.
 OPTIM_WRAPPER_CONSTRUCTORS = Registry(
     'optimizer constructor',
-    parent=MMENGINE_OPTIM_WRAPPER_CONSTRUCTORS,
-    locations=['mmyolo.engine.optimizers'])
+    parent=MMENGINE_OPTIM_WRAPPER_CONSTRUCTORS)
 # manage all kinds of parameter schedulers like `MultiStepLR`
 PARAM_SCHEDULERS = Registry(
     'parameter scheduler',
-    parent=MMENGINE_PARAM_SCHEDULERS,
-    locations=['mmyolo.engine.optimizers'])
+    parent=MMENGINE_PARAM_SCHEDULERS)
 # manage all kinds of metrics
 METRICS = Registry(
-    'metric', parent=MMENGINE_METRICS, locations=['mmyolo.engine'])
+    'metric', parent=MMENGINE_METRICS)
 
 # manage task-specific modules like anchor generators and box coders
 TASK_UTILS = Registry(
-    'task util', parent=MMENGINE_TASK_UTILS, locations=['mmyolo.models'])
+    'task util', parent=MMENGINE_TASK_UTILS)
 
 # manage visualizer
 VISUALIZERS = Registry(
-    'visualizer', parent=MMENGINE_VISUALIZERS, locations=['mmyolo.utils'])
+    'visualizer', parent=MMENGINE_VISUALIZERS)
 # manage visualizer backend
 VISBACKENDS = Registry(
-    'vis_backend', parent=MMENGINE_VISBACKENDS, locations=['mmyolo.utils'])
+    'vis_backend', parent=MMENGINE_VISBACKENDS)
