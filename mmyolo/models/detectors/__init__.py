@@ -1,4 +1,4 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from .yolo_detector import YOLODetector
+from .xtor import YOLODetector, EncoderDecoder
 
-__all__ = ['YOLODetector']
+__all__ = ['YOLODetector', 'EncoderDecoder']
