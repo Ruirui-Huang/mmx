@@ -12,7 +12,7 @@ from mmengine.fileio import load
 from mmengine.registry import init_default_scope
 from mmengine.utils import ProgressBar
 
-from mmyolo.registry import DATASETS
+from mmx.registry import DATASETS
 
 
 def parse_args():

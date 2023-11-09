@@ -13,7 +13,7 @@ from mmengine.runner import Runner, load_checkpoint
 from mmengine.utils import mkdir_or_exist
 from mmengine.utils.dl_utils import set_multi_processing
 
-from mmyolo.registry import MODELS
+from mmx.registry import MODELS
 
 
 # TODO: Refactoring and improving

@@ -8,7 +8,7 @@ import numpy as np
 from mmengine import Config
 from mmengine.runner import Runner, load_checkpoint
 from mmengine.model import is_model_wrapper
-from mmyolo.models import RepVGGBlock
+from mmx.models import RepVGGBlock
 from merge_bn import fuse_bn_recursively
 sys.path.append(osp.dirname(osp.dirname(osp.realpath(__file__))))
 

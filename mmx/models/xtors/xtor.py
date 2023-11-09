@@ -1,5 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from mmyolo.models.detectors import YOLODetector as BaseYOLODetector
+from mmx.models.xtors import YOLODetector as BaseYOLODetector
 from mmseg.models.segmentors import EncoderDecoder as BaseEncoderDecoder
 from mmx.registry import MODELS
 
