@@ -11,8 +11,8 @@ from mmengine.registry import init_default_scope
 from mmengine.utils import ProgressBar
 from prettytable import PrettyTable
 
-from mmx.registry import DATASETS
-from mmx.utils.misc import show_data_classes
+from mmyolo.registry import DATASETS
+from mmyolo.utils.misc import show_data_classes
 
 
 def parse_args():

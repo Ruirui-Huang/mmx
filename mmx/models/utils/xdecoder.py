@@ -3,7 +3,6 @@ from mmengine.model import BaseModule
 from mmcv.cnn import ConvModule
 from .utils import DeconvModule, SEModule, ReparamLargeKernelConv, ReparamAsymKernelConv
 
-
 class XDecoder(BaseModule):
 
     def __init__(self,

@@ -1,14 +1,12 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from .yolo_head import DetYOLOv5HeadModule, DetYOLOv5Head, DetYOLOv7Head
 from .psem_head import PSemHead
-from .segfcn_head import SegFCNHead
+from .seg_fcn_head import SegFCNHead
 from .segformer_head import SegformerHead
-from .smt_head import SegmenterMaskTransformerHead
-from .usem_head import USemHead
+from .segmenter_mask_head import SegmenterMaskTransformerHead
 from .uper_head import UPerHead
-from .cls_gap import ClsGAP
-from .feinetup_head import FEINetUpHead
+from .usem_head import USemHead
+from .yolo_head import DetYOLOv5HeadModule, DetYOLOv5Head, DetYOLOv7Head
 
 __all__ = [
-    'DetYOLOv5HeadModule', 'DetYOLOv5Head', 'DetYOLOv7Head', 'PSemHead', 'SegFCNHead', 'SegformerHead', 'SegmenterMaskTransformerHead', 'USemHead', 'UPerHead', 'ClsGAP', 'FEINetUpHead'
+    'PSemHead', 'SegFCNHead', 'SegformerHead', 'SegmenterMaskTransformerHead', 'UPerHead', 'USemHead', 'DetYOLOv5HeadModule', 'DetYOLOv5Head', 'DetYOLOv7Head'
 ]
