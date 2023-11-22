@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 
 def getArgs():
-    parser = argparse.ArgumentParser(description="some description")
+    parser = argparse.ArgumentParser(description="语义分割预标注！")
     parser.add_argument('--token', type=str, required=True)
     parser.add_argument('--jsonFile', type=str, required=True)
     parser.add_argument('--filesInfo', type=str, required=True)
