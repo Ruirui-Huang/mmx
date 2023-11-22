@@ -61,7 +61,7 @@ class PreLabeling():
         self.maskId = np.random.randint(0, 255, self.num_classes)
         self.colors = [np.random.randint(0, 255, 3) for _ in range(self.num_classes)]
 
-    def ImagePreProcess(self, path_img):
+    def ImagePreProcess(self, path_img, img_size):
         """数据预处理
         Args:
             path_img: 图片路径
@@ -69,34 +69,35 @@ class PreLabeling():
         """
         self.img = cv2.imread(path_img)
         self.H, self.W, _ = self.img.shape
-        input_size = inputInfo["args"]['input_size']
         # 图像缩放
-        resized_img = cv2.resize(self.img, [input_size, input_size])
+        resized_img = cv2.resize(self.img, img_size)
         # 归一化
         mean = np.array([0, 0, 0], dtype=np.float32)
         std = np.array([255, 255, 255], dtype=np.float32)
         resized_img = (resized_img - mean) / std
         return resized_img
         
-    def OnnxInference(self, image):
+    def OnnxInference(self, path_img):
         """ONNX前向
         Args:
-            image: 图片数据
+            path_img: 图片路径
         Returns: 原图坐标系下的分割掩码结果
         """
         path_onnx = inputInfo["args"]['path_onnx']
         assert osp.exists(path_onnx), print(f"{path_onnx}不存在！")
-        
-        image = [image.transpose(2, 0, 1).astype(np.float32)]
-        
         sess = ort.InferenceSession(path_onnx, providers=['CUDAExecutionProvider'])
-        sess_input = {sess.get_inputs()[0].name: image}
+
+        img_size = sess.get_inputs()[0].shape[-2:]
+        input_name = sess.get_inputs()[0].name
+
+        image = self.ImagePreProcess(path_img, img_size)
+        image = image.transpose(2, 0, 1).astype(np.float32)
         
         sess_output = []
         for out in sess.get_outputs():
             sess_output.append(out.name)
 
-        outputs = sess.run(output_names=sess_output, input_feed=sess_input)[0][0] # C, W, H
+        outputs = sess.run(output_names=sess_output, input_feed={input_name: [image]})[0][0] # C, W, H
         outputs = outputs.transpose(1, 2, 0) # W, H, C
         outputs = cv2.resize(outputs, [self.W, self.H]) # H, W, C
         return np.argmax(outputs, 2) # H, W
@@ -198,8 +199,7 @@ class PreLabeling():
         info = json.loads(info)
         path_img = info["file"]
         if osp.splitext(path_img)[-1] != '.jpg': return
-        input_img = self.ImagePreProcess(path_img)
-        pred = self.OnnxInference(input_img)
+        pred = self.OnnxInference(path_img)
         self.GenerateJson(pred, info)
         # self.GenerateMask(pred, path_img)
         
