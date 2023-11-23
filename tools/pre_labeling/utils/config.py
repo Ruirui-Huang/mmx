@@ -1,10 +1,5 @@
 from enum import Enum
 
-class TASK_TYPE(Enum):
-    DET = 'det'
-    SEG = 'seg'
-    POSE = 'pose'
-
 class ModelType(Enum):
     YOLOV5 = 'yolov5'
     YOLOX = 'yolox'
