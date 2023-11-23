@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 import onnxruntime as ort
 import pycocotools.mask as mask_util
-from .utils import Preprocess, NpEncoder, multi_processing_pipeline, ShowMask
+from .utils import Preprocess, NpEncoder, multi_processing_pipeline, imshow_semantic
 
 def getArgs():
     parser = argparse.ArgumentParser(description="语义分割预标注！")
@@ -136,7 +136,7 @@ class PreLabeling():
         self.GenerateJson(pred, info)
         # 线下预标需要开启看效果
         if bool(inputInfo["args"]["show_result"]):
-            ShowMask(pred, path_img)
+            imshow_semantic(self.img, pred)
         
     def callback(self, event):
         p_bar.update()
