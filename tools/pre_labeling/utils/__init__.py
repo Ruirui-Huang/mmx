@@ -4,3 +4,4 @@ from .numpy_coder import Decoder
 from .preprocess import Preprocess
 from .show_result import imshow_semantic
 from .utils import multi_processing_pipeline, NpEncoder
+from onnx_od import onnx_od

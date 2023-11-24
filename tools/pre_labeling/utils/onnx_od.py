@@ -50,7 +50,7 @@ def path_to_list(path: str):
         raise RuntimeError
     return res_list
 
-def main():
+def onnx_od():
     args = parse_args()
     assert args.class_show, print("class_show为空！")
     model_type = ModelType(args.type.lower())
@@ -104,5 +104,5 @@ def main():
         fw.close()
 
 if __name__ == '__main__':
-    main()
+    onnx_od()
 
