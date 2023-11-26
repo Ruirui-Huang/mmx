@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
-import os, shutil, argparse, json, warnings
+import os, argparse, json, warnings
 warnings.filterwarnings("ignore")
 import cv2
 import os.path as osp
 import pandas as pd
-from tqdm import tqdm
 from multiprocessing import Pool
 from mmengine.config import Config
-from utils import NpEncoder, onnx_od, read_cfg, deal_unlabeled_sample, imshow_det
+from utils import NpEncoder, onnx_od, read_cfg, Findparent, deal_unlabeled_sample, imshow_det
 
 def getArgs():
     parser = argparse.ArgumentParser(description="目标检测预标注！")
@@ -26,14 +25,14 @@ class Prelabeling:
         fileInfo.close()
         self.nproc = self.inputInfo["args"]["n_process"]
         self.path_imgs = [info["file"] for info in self.info]
+        self.df = pd.DataFrame(columns=['path_img', 'labels'])
 
-    def onnx_inference(self, onnx_map):
+    def onnx_inference(self, path_imgs, onnx_map):
         """ONNX推理
         Args: 
             onnx_map: 父级或子级参数
         Returns: DataFrame存储所有图片的预标注结果
         """
-        self.df = pd.DataFrame(columns=['path_img', 'labels'])
         pool = Pool(self.nproc)
         for m in onnx_map:
             pool.apply_async(
@@ -57,26 +56,26 @@ class Prelabeling:
                 index = self.df['path_img'][self.df['path_img'].values == path_img].index
                 self.df.loc[index, 'labels'].append(labels)
 
-    def generate_single_json(self, info_base, info_od1, info_od2):
+    def generate_single_json(self, info, labels):
         """预标注结果写入
         Args:
-            info_base: 图片基本信息
-            info_od1: 一级od预标结果
-            info_od2: 二级od预标结果
+            info:   图片基本信息
+            labels: 预标结果
         Returns: 
         """
-        path_img = info_base["file"]
-        path_json = info_base["json"].replace(self.inputInfo["markDataInPath"], self.inputInfo["markDataOutPath"])
+        path_img = info["file"]
+        path_json = info["json"].replace(self.inputInfo["markDataInPath"], self.inputInfo["markDataOutPath"])
         image = cv2.imread(path_img)
         H, W, _ = image.shape
         output_info = {
-            "baseId": info_base["baseId"],
+            "baseId": info["baseId"],
             "fileName": osp.basename(path_img),
             "imgSize": [W, H],
             "objects": []
         }
         obj_idx = 1
-        for label in info_od1:
+        labels_od2 = []
+        for label in labels:
             x0, y0, x1, y1, cls = label
             obj_json = {
                     "class": cls,
@@ -88,17 +87,21 @@ class Prelabeling:
                 }
             output_info["objects"].append(obj_json)
             obj_idx += 1
-        return path_json, output_info, info_od2
+        return path_img, path_json, output_info, labels_od2
         
-    def callback_merge_json(self, path_json, parent, child):
+    def callback_merge_json(self, path_img, path_json, output_info, labels_od2):
         """一级od和二级od嵌套
         Args:
+            path_img: 预标注图片路径
             path_json: 预标注json路径
-            parent: 一级od标注信息
-            child: 二级od标注信息
+            output_info: 一级od标注信息
+            labels_od2: 二级od标注结果
         Returns: 
         """
-        output_info = parent
+        if not len(labels_od2):
+            fp = Findparent()
+            output_info = fp(path_img, output_info, labels_od2)
+
         fileDir = osp.dirname(path_json)
         if not osp.exists(fileDir): os.makedirs(fileDir)
         with open(path_json, 'w') as json_f:
@@ -111,21 +114,21 @@ class Prelabeling:
         assert prelabeling_map, print("检查prelabeling_map配置！")
         parent_map, child_map = read_cfg(prelabeling_map)
         # 一级OD
-        self.onnx_inference(parent_map)
-        df_od1 = self.df
+        self.onnx_inference(self.path_imgs, parent_map)
+
         # 二级OD
-        if child_map:
-            self.onnx_inference(child_map)
-            df_od2 = self.df
+        if len(child_map):
+            self.onnx_inference(osp.join(osp.dirname(self.path_imgs[0]), "crop_imgs"), child_map)
+
         # json嵌套
         pool = Pool(self.nproc)
-        for info_base in self.info:
-            index = df_od1['path_img'][df_od1['path_img'].values == path_img].index
-            info_od1 = df_od1.loc[index, 'labels']
-            info_od2 = None
+        for info in self.info:
+            path_img = info["path_img"]
+            index = self.df['path_img'][self.df['path_img'].values == path_img].index
+            labels = self.df.loc[index, 'labels']
             pool.apply_async(
                 func=self.generate_single_json, 
-                args=(info_base, info_od1, info_od2, ),
+                args=(info, labels, ),
                 callback=self.callback_merge_json
             )
         pool.close()
