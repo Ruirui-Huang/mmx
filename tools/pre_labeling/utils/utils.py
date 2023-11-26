@@ -43,10 +43,10 @@ def path_to_list(path: str):
         raise RuntimeError
     return res_list
 
-def read_cfg(PRELABELING_MAP, args):
+def read_cfg(prelabeling_map, args):
     """模型库解析拆分一级OD和二级OD
     Args:
-        PRELABELING_MAP: 模型库。以onnx名称作为键值，存储onnx的详细信息
+        prelabeling_map: 模型库。以onnx名称作为键值，存储onnx的详细信息
         args: 需要预标的目标类别
     Returns: 细化一级od和二级od
     """
@@ -60,9 +60,9 @@ def read_cfg(PRELABELING_MAP, args):
         'ppyoloe', 
         'ppyoloep'
     ]
-    onnx_map = {"with_parent": {}, "without_parent": {}}
+    parent, child = {}, {}
     for cls, is_used in args.items():
-        for onnx_name, value in PRELABELING_MAP.items():
+        for onnx_name, value in prelabeling_map.items():
             if cls not in value["Used_classes"] or not is_used: continue
             num_classes = value["Num_classes"]
             assert value["Model_type"] in ModelType  and \
@@ -76,65 +76,43 @@ def read_cfg(PRELABELING_MAP, args):
             max(value["Class_index"]) < num_classes and \
             (value["Parent"] == None or len(value["Parent"]) == len(value["Used_classes"])), print("请检查config配置！")
 
-            index = value["Class_index"][value["Used_classes"].index(cls)]
             value["Path_onnx"] = osp.join("./model_zoo", onnx_name + ".onnx")
-            onnx_map["without_parent"][onnx_name] = value
-            onnx_map["with_parent"][onnx_name] = value
-            if "Class_show" not in onnx_map["without_parent"][onnx_name].keys():
-                onnx_map["without_parent"][onnx_name]["Class_show"] = {
+            if onnx_name not in parent.keys():
+                child[onnx_name] = copy.copy(value)
+                parent[onnx_name] = copy.copy(value)
+
+            if "Class_show" not in child[onnx_name].keys():
+                parent[onnx_name]["Class_show"] = {
                     "classes": [f"obj{i}" for i in range(num_classes)], 
                     "is_show": [0]*num_classes
                 }
-            # if "Class_show" not in onnx_map["with_parent"][onnx_name].keys():
-            #     onnx_map["with_parent"][onnx_name]["Class_show"] = {
-            #         "classes": [f"obj{i}" for i in range(num_classes)], 
-            #         "is_show": [0]*num_classes
-            #     }
-            if not value["Parent"]: 
-                onnx_map["without_parent"][onnx_name]["Class_show"]["classes"][index] = cls
-                onnx_map["without_parent"][onnx_name]["Class_show"]["is_show"][index] = 1
+                child[onnx_name]["Class_show"] = {
+                    "classes": [f"obj{i}" for i in range(num_classes)], 
+                    "is_show": [0]*num_classes
+                }
+
+            index = value["Class_index"][value["Used_classes"].index(cls)]
+            if value["Parent"] == None: 
+                parent[onnx_name]["Class_show"]["classes"][index] = cls
+                parent[onnx_name]["Class_show"]["is_show"][index] = 1
             else:
-                if not value["Parent"][index]:
-                    onnx_map["without_parent"][onnx_name]["Class_show"]["classes"][index] = cls
-                    onnx_map["without_parent"][onnx_name]["Class_show"]["is_show"][index] = 1
-                # else:
-                #     onnx_map["with_parent"][onnx_name]["Class_show"]["classes"][index] = cls
-                #     onnx_map["with_parent"][onnx_name]["Class_show"]["is_show"][index] = 1
+                if value["Parent"][index] == None:
+                    parent[onnx_name]["Class_show"]["classes"][index] = cls
+                    parent[onnx_name]["Class_show"]["is_show"][index] = 1
+                else:
+                    child[onnx_name]["Class_show"]["classes"][index] = cls
+                    child[onnx_name]["Class_show"]["is_show"][index] = 1
 
     parent_map, child_map = [], []
-    for _, map in onnx_map["without_parent"].items():
+    for _, map in parent.items():
         if not sum(map["Class_show"]["is_show"]): continue
         parent_map.append(map)
-    # for _, map in onnx_map["with_parent"].items():
-    #     if not sum(map["Class_show"]["is_show"]): continue
-    #     child_map.append(map)
-    print(parent_map, "\n", child_map)
+
+    for _, map in child.items():
+        if not sum(map["Class_show"]["is_show"]): continue
+        child_map.append(map)
+
     return parent_map, child_map
-
-PRELABELING_MAP = {
-    "model1": {
-        "Model_type": "yolov5",   # 模型类型
-        "Num_classes": 3,             # 模型类别数
-        "Score_thr": 0.3,               # 置信度阈值
-        "Box_thr": 0.65,                # iou阈值
-        "Anchors": [[(9, 3), (6, 16), (26, 8)], [(15, 40), (32, 73), (63, 130)], [(91, 99), (190, 182),(339, 276)]],                       # 模型anchors
-        "Used_classes": ["class1", "class2", "class3"],    # 表示使用了这个模型中哪几个类别
-        "Class_index": [0, 1, 2],                           # 使用的类别在classes中的索引
-        "Parent": [None, None, "class4"]                                   # 使用的类别的父级
-    },
-    "model2": {
-        "Model_type": "yolov5",   # 模型类型
-        "Num_classes": 1,             # 模型类别数
-        "Score_thr": 0.3,               # 置信度阈值
-        "Box_thr": 0.65,                # iou阈值
-        "Anchors": [[(9, 3), (6, 16), (26, 8)], [(15, 40), (32, 73), (63, 130)], [(91, 99), (190, 182),(339, 276)]],                       # 模型anchors
-        "Used_classes": ["class4"], # 表示使用了这个模型中哪几个类别
-        "Class_index": [0],             # 使用的类别在classes中的索引
-        "Parent": None                                   # 使用的类别的父级
-    }
-}
-
-read_cfg(PRELABELING_MAP, {"class1": 1, "class2": 0, "class3": 1, "class4": 1})
 
 def deal_unlabeled_sample(path_imgs, path_json, remove=False, path_save=None):
     """处理没有标注的数据

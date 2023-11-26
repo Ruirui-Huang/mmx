@@ -7,7 +7,7 @@ PRELABELING_MAP = {
         "Anchors": [[(9, 3), (6, 16), (26, 8)], [(15, 40), (32, 73), (63, 130)], [(91, 99), (190, 182),(339, 276)]],                       # 模型anchors
         "Used_classes": ["class1", "class2", "class3"],    # 表示使用了这个模型中哪几个类别
         "Class_index": [0, 1, 2],                           # 使用的类别在classes中的索引
-        "Parent": [None, None, "class4"]                                   # 使用的类别的父级
+        "Parent": ["class3", None, None]                                   # 使用的类别的父级
     },
     "model2": {
         "Model_type": "yolov5",   # 模型类型
@@ -17,7 +17,7 @@ PRELABELING_MAP = {
         "Anchors": [[(9, 3), (6, 16), (26, 8)], [(15, 40), (32, 73), (63, 130)], [(91, 99), (190, 182),(339, 276)]],                       # 模型anchors
         "Used_classes": ["class4"], # 表示使用了这个模型中哪几个类别
         "Class_index": [0],             # 使用的类别在classes中的索引
-        "Parent": None                                   # 使用的类别的父级
+        "Parent": ["class3"]                                   # 使用的类别的父级
     },
     "car_tail": {
         "Model_type": "yolov5",

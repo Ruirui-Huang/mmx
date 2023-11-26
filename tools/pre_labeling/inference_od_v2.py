@@ -29,15 +29,16 @@ class Prelabeling:
 
     def onnx_inference(self, onnx_map):
         """ONNX推理
-        Args:
-        Returns: 
+        Args: 
+            onnx_map: 父级或子级参数
+        Returns: DataFrame存储所有图片的预标注结果
         """
         self.df = pd.DataFrame(columns=['path_img', 'labels'])
         pool = Pool(self.nproc)
-        for map in onnx_map:
+        for m in onnx_map:
             pool.apply_async(
                 func=onnx_od, 
-                args=(map, ), 
+                args=(self.path_imgs, m, ), 
                 callback=self.callback_merge_labels)
         pool.close()
         pool.join()
@@ -45,7 +46,7 @@ class Prelabeling:
     def callback_merge_labels(self, result):
         """预标注结果合并
         Args:
-            result: 预标注结果[path_img, labels]
+            result: 预标注结果。key为path_img, value为图片对应的labels
         Returns: 
         """
         for path_img, labels in result.items():
@@ -68,7 +69,6 @@ class Prelabeling:
         path_json = info_base["json"].replace(self.inputInfo["markDataInPath"], self.inputInfo["markDataOutPath"])
         image = cv2.imread(path_img)
         H, W, _ = image.shape
-
         output_info = {
             "baseId": info_base["baseId"],
             "fileName": osp.basename(path_img),
@@ -82,13 +82,12 @@ class Prelabeling:
                     "class": cls,
                     "parent": [],
                     "coord": [[x0, y0], [x1, y1]],
-                    "id": self.obj_idx,
-                    "shape": "poly",
+                    "id": obj_idx,
+                    "shape": "rect",
                     "props": {}
                 }
             output_info["objects"].append(obj_json)
             obj_idx += 1
-
         return path_json, output_info, info_od2
         
     def callback_merge_json(self, path_json, parent, child):
@@ -99,6 +98,7 @@ class Prelabeling:
             child: 二级od标注信息
         Returns: 
         """
+        output_info = parent
         fileDir = osp.dirname(path_json)
         if not osp.exists(fileDir): os.makedirs(fileDir)
         with open(path_json, 'w') as json_f:
@@ -107,9 +107,9 @@ class Prelabeling:
         
     def run(self):
         cfg = Config.fromfile('./config.py')
-        PRELABELING_MAP = cfg.get('PRELABELING_MAP', None)
-        assert PRELABELING_MAP, print("检查PRELABELING_MAP配置！")
-        parent_map, child_map = read_cfg(PRELABELING_MAP)
+        prelabeling_map = cfg.get('prelabeling_map', None)
+        assert prelabeling_map, print("检查prelabeling_map配置！")
+        parent_map, child_map = read_cfg(prelabeling_map)
         # 一级OD
         self.onnx_inference(parent_map)
         df_od1 = self.df
@@ -135,6 +135,9 @@ class Prelabeling:
         if bool(self.inputInfo["args"]["show_result"]):
             deal_unlabeled_sample(self.path_imgs, self.inputInfo["markDataOutPath"])
             for path_img in self.path_imgs:
+                bboxes = [label[:4] for label in self.df[path_img]]
+                classes = set([label[4] for label in self.df[path_img]])
+                labels = [classes.index(label[4]) for label in self.df[path_img]]
                 imshow_det(path_img, bboxes, labels, save_path=osp.join(osp.dirname(osp.dirname(path_img)), 'show'))
 
 if __name__ == '__main__':
