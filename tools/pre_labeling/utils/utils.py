@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import json, os, shutil, copy
 from enum import Enum
 import os.path as osp
@@ -6,17 +7,18 @@ from tqdm import tqdm
 import multiprocessing 
 from pathlib import Path
 
-class NpEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
-    
 def multi_processing_pipeline(single_func, task_list, n_process=None, callback=None, **kw):
+    """基于流水线思想的多进程处理。将单个任务放入进程池中，由系统调度哪个进程处理该任务
+    Args:
+        single_func: 单进程处理函数, 传入单个任务
+        task_list: 任务列表
+        n_process: 进程的数量，当n_process为None时，表示使用全部cpu核心
+    """
+    if n_process:
+        n_process = n_process
+    else:
+        n_process = os.cpu_count()
+
     pool = multiprocessing.Pool(processes=n_process)
     process_pool = []
     for i in range(len(task_list)):
@@ -27,6 +29,16 @@ def multi_processing_pipeline(single_func, task_list, n_process=None, callback=N
     pool.join()
     print('success!')
     return process_pool
+    
+class Npencoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp')
 
@@ -46,9 +58,8 @@ def path_to_list(path: str):
 def read_cfg(prelabeling_map, args):
     """模型库解析拆分一级OD和二级OD
     Args:
-        prelabeling_map: 模型库。以onnx名称作为键值，存储onnx的详细信息
-        args: 需要预标的目标类别
-    Returns: 细化一级od和二级od
+        prelabeling_map (dict): 模型库。以onnx名称作为键值，存储onnx的详细信息
+        args (dict): 需要预标的目标类别信息
     """
     ModelType = [
         'yolov5', 
@@ -114,28 +125,31 @@ def read_cfg(prelabeling_map, args):
 
     return parent_map, child_map
 
-def deal_unlabeled_sample(path_imgs, path_json, remove=False, path_save=None):
+def deal_unlabeled_sample(path_imgs, path_jsons=None, remove=False, save_path=None):
     """处理没有标注的数据
     Args: 
-        path_imgs: 图片路径
-        path_json: 预标注json路径
-        remove: 移动到path_save或者直接删除
-        path_save: 存储没有标注结果的图片
+        path_imgs (str): 图片路径
+        path_json (str): 预标注json路径
+        remove (bool): 移动到save_path或者直接删除
+        save_path (str): 存储没有标注结果的图片
     Returns: 
     """
-    files = path_to_list(path_imgs)
-    p_bar = tqdm(files)
-    for img in files:
-        path_img = osp.join(path_imgs, img)
-        path_json = osp.join(path_json, img) + '.json'
-        if not osp.exists(path_json):
-            if remove:
-                os.remove(path_img)
-            else:
-                if not save_path:
-                    save_path = osp.join(osp.dirname(path_img), 'unlabeld')
-                if not osp.exists(save_path): 
-                    os.makedirs(save_path)
-                shutil.move(path_img, save_path)
+    if isinstance(path_imgs, str): path_imgs = path_to_list(path_imgs)
+    p_bar = tqdm(path_imgs, ncols=100)
+    p_bar.set_description("Unlabeled data Processing")
+    for path_img in path_imgs:
         p_bar.update()
+        if path_jsons: 
+            path_json = osp.join(path_json, osp.split(path_img)[-1]).replace('.jpg', '.json')
+        else:
+            path_json = path_img.replace('.jpg', '.json')
+        if osp.exists(path_json): continue
+        if remove:
+            os.remove(path_img)
+        else:
+            if not save_path:
+                save_path = osp.join(osp.dirname(path_img), 'unlabeld')
+            if not osp.exists(save_path): 
+                os.makedirs(save_path)
+            shutil.move(path_img, save_path)
     p_bar.close()

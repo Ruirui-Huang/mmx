@@ -4,11 +4,15 @@ warnings.filterwarnings("ignore")
 import cv2
 import os.path as osp
 import pandas as pd
+from tqdm import tqdm
 from multiprocessing import Pool
 from mmengine.config import Config
-from utils import NpEncoder, onnx_od, read_cfg, Findparent, deal_unlabeled_sample, imshow_det
+from utils import onnx_od, read_cfg, deal_unlabeled_sample, imshow_det, Npencoder, Findparent
 
 def getArgs():
+    """
+    巨灵平台获取该方法参数的入口
+    """
     parser = argparse.ArgumentParser(description="目标检测预标注！")
     parser.add_argument('--token', type=str, required=True)
     parser.add_argument('--jsonFile', type=str, required=True)
@@ -30,8 +34,7 @@ class Prelabeling:
     def onnx_inference(self, path_imgs, onnx_map):
         """ONNX推理
         Args: 
-            onnx_map: 父级或子级参数
-        Returns: DataFrame存储所有图片的预标注结果
+            onnx_map (dict): 父级或子级onnx参数
         """
         pool = Pool(self.nproc)
         for m in onnx_map:
@@ -45,8 +48,7 @@ class Prelabeling:
     def callback_merge_labels(self, result):
         """预标注结果合并
         Args:
-            result: 预标注结果。key为path_img, value为图片对应的labels
-        Returns: 
+            result (dict): 预标注结果。key为图片路径, value为图片对应的所有标注结果
         """
         for path_img, labels in result.items():
             if not len(labels): print(f"{path_img}中不存在目标！")
@@ -59,9 +61,8 @@ class Prelabeling:
     def generate_single_json(self, info, labels):
         """预标注结果写入
         Args:
-            info:   图片基本信息
-            labels: 预标结果
-        Returns: 
+            info (dict):   图片基本信息
+            labels (list): 预标结果，其中各元素的组成为[左上角横坐标, 左上角纵坐标, 右下角横坐标, 右下角纵坐标, 类别, 父级类别]
         """
         path_img = info["file"]
         path_json = info["json"].replace(self.inputInfo["markDataInPath"], self.inputInfo["markDataOutPath"])
@@ -78,41 +79,60 @@ class Prelabeling:
         for label in labels:
             x0, y0, x1, y1, cls = label
             obj_json = {
-                    "class": cls,
+                    "class": str(cls),
                     "parent": [],
                     "coord": [[x0, y0], [x1, y1]],
-                    "id": obj_idx,
+                    "id": int(obj_idx),
                     "shape": "rect",
                     "props": {}
-                }
+            }
             output_info["objects"].append(obj_json)
             obj_idx += 1
-        return path_img, path_json, output_info, labels_od2
+        return [path_img, path_json, output_info, labels_od2]
         
-    def callback_merge_json(self, path_img, path_json, output_info, labels_od2):
+    def callback_merge_json(self, result):
         """一级od和二级od嵌套
         Args:
-            path_img: 预标注图片路径
-            path_json: 预标注json路径
-            output_info: 一级od标注信息
-            labels_od2: 二级od标注结果
-        Returns: 
+            result (list): 组成为[图片路径, 标注路径, 一级od标注信息, 二级od标注信息] 
         """
-        if not len(labels_od2):
-            fp = Findparent()
-            output_info = fp(path_img, output_info, labels_od2)
-
+        # 存在二级od则匹配嵌套
+        # if not len(result[-1]):
+        #     fp = Findparent()
+        #     output_info = fp(result)
+        output_info = result[2]
+        path_json = result[1]
         fileDir = osp.dirname(path_json)
         if not osp.exists(fileDir): os.makedirs(fileDir)
         with open(path_json, 'w') as json_f:
-            json.dump(output_info, json_f, indent=2, cls=NpEncoder)
+            json.dump(output_info, json_f, indent=2, cls=Npencoder)
         json_f.close()
+
+    def show(self):
+        """预标注结果可视化
+        """
+        p_bar = tqdm(self.path_imgs, ncols=100)
+        p_bar.set_description('Drawing')
+        for path_img in self.path_imgs:
+            p_bar.update()
+            index = self.df['path_img'][self.df['path_img'].values == path_img].index
+            if not len(self.df['labels'].values[index]): continue
+            llabels = self.df['labels'].values[index][0]
+            bboxes = [label[:4] for label in llabels]
+            classes = list(set([label[4] for label in llabels]))
+            labels = [classes.index(label[4]) for label in llabels]
+            imshow_det(
+                path_img, bboxes, labels, 
+                classes=[label[4] for label in llabels], 
+                save_path=osp.join(osp.dirname(osp.dirname(path_img)), 'show')
+            )
+        p_bar.close()
+
         
     def run(self):
-        cfg = Config.fromfile('./config.py')
+        cfg = Config.fromfile('./utils/config.py')
         prelabeling_map = cfg.get('prelabeling_map', None)
         assert prelabeling_map, print("检查prelabeling_map配置！")
-        parent_map, child_map = read_cfg(prelabeling_map)
+        parent_map, child_map = read_cfg(prelabeling_map, self.inputInfo["args"])
         # 一级OD
         self.onnx_inference(self.path_imgs, parent_map)
 
@@ -120,15 +140,16 @@ class Prelabeling:
         if len(child_map):
             self.onnx_inference(osp.join(osp.dirname(self.path_imgs[0]), "crop_imgs"), child_map)
 
-        # json嵌套
+        # 生成dahuajson
         pool = Pool(self.nproc)
         for info in self.info:
-            path_img = info["path_img"]
+            path_img = info["file"]
             index = self.df['path_img'][self.df['path_img'].values == path_img].index
-            labels = self.df.loc[index, 'labels']
+            labels = self.df['labels'].values[index]
+            if not len(labels): continue
             pool.apply_async(
                 func=self.generate_single_json, 
-                args=(info, labels, ),
+                args=(info, labels[0], ),
                 callback=self.callback_merge_json
             )
         pool.close()
@@ -136,12 +157,9 @@ class Prelabeling:
 
         # 线下预标开启看效果，以及没有标注结果的情况
         if bool(self.inputInfo["args"]["show_result"]):
-            deal_unlabeled_sample(self.path_imgs, self.inputInfo["markDataOutPath"])
-            for path_img in self.path_imgs:
-                bboxes = [label[:4] for label in self.df[path_img]]
-                classes = set([label[4] for label in self.df[path_img]])
-                labels = [classes.index(label[4]) for label in self.df[path_img]]
-                imshow_det(path_img, bboxes, labels, save_path=osp.join(osp.dirname(osp.dirname(path_img)), 'show'))
+            # deal_unlabeled_sample(self.path_imgs)
+            self.show()
+            
 
 if __name__ == '__main__':
     parser = getArgs()

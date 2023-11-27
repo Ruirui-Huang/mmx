@@ -1,23 +1,15 @@
-PRELABELING_MAP = {
-    "model1": {
+# 模型新增规则：key为新增onnx的名称，value参考prelabeling_map["smart_logistics"]
+
+prelabeling_map = {
+    "smart_logistics": {
         "Model_type": "yolov5",   # 模型类型
-        "Num_classes": 3,             # 模型类别数
-        "Score_thr": 0.3,               # 置信度阈值
-        "Box_thr": 0.65,                # iou阈值
-        "Anchors": [[(9, 3), (6, 16), (26, 8)], [(15, 40), (32, 73), (63, 130)], [(91, 99), (190, 182),(339, 276)]],                       # 模型anchors
+        "Num_classes": 3,         # 模型类别数
+        "Score_thr": 0.3,         # 置信度阈值
+        "Box_thr": 0.65,          # iou阈值
+        "Anchors": [[(9, 3), (6, 16), (26, 8)], [(15, 40), (32, 73), (63, 130)], [(91, 99), (190, 182),(339, 276)]],                             # 模型anchors
         "Used_classes": ["class1", "class2", "class3"],    # 表示使用了这个模型中哪几个类别
-        "Class_index": [0, 1, 2],                           # 使用的类别在classes中的索引
-        "Parent": ["class3", None, None]                                   # 使用的类别的父级
-    },
-    "model2": {
-        "Model_type": "yolov5",   # 模型类型
-        "Num_classes": 1,             # 模型类别数
-        "Score_thr": 0.3,               # 置信度阈值
-        "Box_thr": 0.65,                # iou阈值
-        "Anchors": [[(9, 3), (6, 16), (26, 8)], [(15, 40), (32, 73), (63, 130)], [(91, 99), (190, 182),(339, 276)]],                       # 模型anchors
-        "Used_classes": ["class4"], # 表示使用了这个模型中哪几个类别
-        "Class_index": [0],             # 使用的类别在classes中的索引
-        "Parent": ["class3"]                                   # 使用的类别的父级
+        "Class_index": [0, 1, 2],                          # 使用的类别在classes中的索引
+        "Parent": [None, None, None]                       # 使用的类别的父级
     },
     "car_tail": {
         "Model_type": "yolov5",
@@ -89,7 +81,7 @@ PRELABELING_MAP = {
         "Class_index": [0], 
         "Parent": None
     },
-    "WaterGage": {
+    "gage_det": {
         "Model_type": "yolov5",
         "Num_classes": 1,
         "Score_thr": 0.3,
@@ -99,7 +91,7 @@ PRELABELING_MAP = {
         "Class_index": [0], 
         "Parent": None
     },
-    "WaterGageChar": {
+    "gage_rec": {
         "Model_type": "yolov5",
         "Num_classes": 12,
         "Score_thr": 0.3,

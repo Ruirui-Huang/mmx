@@ -36,7 +36,7 @@ def onnx_od(path_imgs, args, out_dir=None):
         image = cv2.imread(file)
         H, W = image.shape[:2]
         # 数据预处理
-        img, (ratio_w, ratio_h) = preprocessor(image, input_size)
+        img, (ratio_w, ratio_h), padding_list = preprocessor(image, input_size)
         # 推理
         features = sess.run(None, {input_name: img})
         # 后处理
@@ -48,16 +48,18 @@ def onnx_od(path_imgs, args, out_dir=None):
 
         if len(decoder_outputs[0]) == 0: continue
         
-        bboxes, scores, labels = non_max_suppression(
+        bboxes, _, labels = non_max_suppression(
             *decoder_outputs, 
             args["Score_thr"],
             args["Box_thr"],)
 
         pre_label = imshow_det(
-            file, bboxes, labels,             save_path=out_dir, 
+            file, bboxes, labels,             
+            save_path=out_dir, 
             is_show=is_show, 
             classes=classes, 
-            input_size=input_size)
+            scale_factor=(ratio_w, ratio_h),
+            padding_list=padding_list)
 
         result[file] = pre_label
 

@@ -1,4 +1,4 @@
-import warnings, json, time, os, argparse
+import warnings, json, time, os, argparse, sys
 warnings.filterwarnings("ignore")
 import cv2
 import os.path as osp
@@ -6,23 +6,17 @@ import numpy as np
 from tqdm import tqdm
 import onnxruntime as ort
 import pycocotools.mask as mask_util
-from .utils import Preprocess, NpEncoder, multi_processing_pipeline, imshow_semantic
+from utils import multi_processing_pipeline, imshow_semantic, Preprocess, Npencoder
 
 def getArgs():
+    """
+    巨灵平台获取该方法参数的入口
+    """
     parser = argparse.ArgumentParser(description="语义分割预标注！")
     parser.add_argument('--token', type=str, required=True)
     parser.add_argument('--jsonFile', type=str, required=True)
     parser.add_argument('--filesInfo', type=str, required=True)
     return parser
-
-parser = getArgs()
-args = parser.parse_args()
-jsonFile = open(args.jsonFile, mode='r', encoding='utf-8')
-inputInfo = json.load(jsonFile)
-fileInfo = open(args.filesInfo, "r", encoding="utf-8")
-data = fileInfo.readlines()
-p_bar = tqdm(data, ncols=100)
-p_bar.set_description('Processing')
 
 class PreLabeling():
     def __init__(self):
@@ -33,40 +27,34 @@ class PreLabeling():
         assert self.num_classes == len(self.show), print("num_classes和show长度不一致！")
         self.maskId = np.random.randint(0, 255, self.num_classes)
         
-    def OnnxInference(self, path_img):
+    def onnx_inference(self, path_img, path_onnx):
         """ONNX前向
         Args:
-            path_img: 图片路径
-        Returns: 原图坐标系下的分割掩码结果
+            path_img (str): 图片路径
+            path_onnx (str): onnx路径
         """
         preprocessor = Preprocess()
-        path_onnx = inputInfo["args"]['path_onnx']
         assert osp.exists(path_onnx), print(f"{path_onnx}不存在！")
         # 加载引擎
         sess = ort.InferenceSession(path_onnx, providers=['CUDAExecutionProvider'])
         # 数据预处理
-        img_size = sess.get_inputs()[0].shape[-2:]
-        self.img = cv2.imread(path_img)
-        self.H, self.W, _ = self.img.shape
-        image, (ratio_w, ratio_h) = preprocessor(self.img, img_size)
-        
+        image = cv2.imread(path_img)
+        input_size = sess.get_inputs()[0].shape[-2:]
+        self.H, self.W, _ = image.shape
+        input_data, (_, _), _ = preprocessor(image, input_size)
         input_name = sess.get_inputs()[0].name
-        sess_output = []
-        for out in sess.get_outputs():
-            sess_output.append(out.name)
         # 推理
-        outputs = sess.run(output_names=sess_output, input_feed={input_name: [image]})[0][0] # C, W, H
+        outputs = sess.run(output_names=None, input_feed={input_name: input_data})[0][0] # C, W, H
         # 后处理
         outputs = outputs.transpose(1, 2, 0) # W, H, C
         outputs = cv2.resize(outputs, [self.W, self.H]) # H, W, C
         return np.argmax(outputs, 2) # H, W
         
-    def GenerateJson(self, result, info):
-        """预标注结果写入
+    def generate_json(self, result, info):
+        """预标注结果写入Dahuajson
         Args:
-            result: 原图坐标系下的分割掩码结果
-            info: 预标注信息
-        Returns: 
+            result (ndarray): 原图坐标系下的分割结果
+            info (dict):   预标注基本信息
         """
         output_json_info = {
             "baseId": info["baseId"],
@@ -83,7 +71,7 @@ class PreLabeling():
             # POLY标注
             if not bool(inputInfo["args"]["use_sam"]):
                 contours = \
-                    cv2.findContours(mask*255, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]        
+                    cv2.findContours(mask*255, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
                 for contour in contours:
                     polygon = contour.reshape(-1, 2)
                     if polygon.shape[0] < 3 or cv2.contourArea(contour) < 9:
@@ -125,24 +113,31 @@ class PreLabeling():
         fileDir = osp.dirname(jsonSavePath)
         if not osp.exists(fileDir): os.makedirs(fileDir)
         with open(jsonSavePath, 'w') as json_f:
-            json.dump(output_json_info, json_f, indent=2, cls=NpEncoder)
+            json.dump(output_json_info, json_f, indent=2, cls=Npencoder)
         json_f.close()
         
     def process(self, info):
         info = json.loads(info)
         path_img = info["file"]
+        path_onnx = osp.join("./model_zoo", inputInfo["args"]['onnx_name'] + ".onnx")
         if osp.splitext(path_img)[-1] != '.jpg': return
-        pred = self.OnnxInference(path_img)
-        self.GenerateJson(pred, info)
+        pred = self.onnx_inference(path_img, path_onnx)
+        self.generate_json(pred, info)
+
         # 线下预标需要开启看效果
-        if bool(inputInfo["args"]["show_result"]):
-            imshow_semantic(self.img, pred)
+        if bool(inputInfo["args"]["save_result"]):
+            imshow_semantic(path_img, pred)
         
     def callback(self, event):
         p_bar.update()
         
     def run(self, n_process):
-        multi_processing_pipeline(self.process, data, n_process=n_process, callback=self.callback)        
+        multi_processing_pipeline(
+            self.process, 
+            data, 
+            n_process=n_process, 
+            callback=self.callback
+        )
           
 def main():
     start = time.time()
@@ -153,6 +148,16 @@ def main():
     p_bar.close()
     end = time.time()
     print(f"预标注耗时：{end-start}s")
+
+
+parser = getArgs()
+args = parser.parse_args()
+jsonFile = open(args.jsonFile, mode='r', encoding='utf-8')
+inputInfo = json.load(jsonFile)
+fileInfo = open(args.filesInfo, "r", encoding="utf-8")
+data = fileInfo.readlines()
+p_bar = tqdm(data, ncols=100)
+p_bar.set_description('Processing')
 
 if __name__ == '__main__':
     main()
