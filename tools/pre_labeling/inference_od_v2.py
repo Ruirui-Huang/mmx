@@ -56,8 +56,8 @@ class Prelabeling:
                 self.df.loc[len(self.df)] = [path_img, labels]
             else:
                 index = self.df['path_img'][self.df['path_img'].values == path_img].index
-                self.df.loc[index, 'labels'].append(labels)
-
+                self.df.loc[index, 'labels'].values[0].extend(labels)
+                
     def generate_single_json(self, info, labels):
         """预标注结果写入
         Args:
@@ -115,14 +115,14 @@ class Prelabeling:
         for path_img in self.path_imgs:
             p_bar.update()
             index = self.df['path_img'][self.df['path_img'].values == path_img].index
-            if not len(self.df['labels'].values[index]): continue
-            llabels = self.df['labels'].values[index][0]
-            bboxes = [label[:4] for label in llabels]
-            classes = list(set([label[4] for label in llabels]))
-            labels = [classes.index(label[4]) for label in llabels]
+            llabels = self.df.loc[index, 'labels'].values
+            if not len(llabels): continue
+            bboxes = [label[:4] for label in llabels[0]]
+            classes = list(set([label[4] for label in llabels[0]]))
+            labels = [classes.index(label[4]) for label in llabels[0]]
             imshow_det(
                 path_img, bboxes, labels, 
-                classes=[label[4] for label in llabels], 
+                classes=[label[4] for label in llabels[0]], 
                 save_path=osp.join(osp.dirname(osp.dirname(path_img)), 'show')
             )
         p_bar.close()

@@ -72,7 +72,7 @@ def imshow_det(img, bboxes, labels, palette=colors, save_path=None, font_scale=0
     """检测结果可视化
     Args:
         img (str | ndarray): 图片路径 or 图片数据
-        bboxes (list): 检测结果。如果检测结果不是在原图坐标系下，还需输入缩放系数scale_factor和padding_list
+        bboxes (list): 检测结果。如果检测结果不是在原图坐标系下，还需输入缩放系数scale_factor 和 padding_list
         labels (list): bboxes对应的预测类别
         palette (list): 各类别颜色
         save_path (str): 可视化结果存储路径
@@ -99,7 +99,7 @@ def imshow_det(img, bboxes, labels, palette=colors, save_path=None, font_scale=0
             cls = classes[label]
         else:
             cls = str(label)
-        x0, y0, x1, y1 = box - np.array(padding_list[2], padding_list[0], padding_list[2], padding_list[0])
+        x0, y0, x1, y1 = box - np.array([padding_list[2], padding_list[0], padding_list[2], padding_list[0]])
         x0 = math.floor(min(max(x0 / ratio_w, 1), W - 1))
         y0 = math.floor(min(max(y0 / ratio_h, 1), H - 1))
         x1 = math.ceil(min(max(x1 / ratio_w, 1), W - 1))
