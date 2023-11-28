@@ -81,18 +81,16 @@ def imshow_det(img, bboxes, labels, palette=colors, save_path=None, font_scale=0
     Returns: 
     """
     # 支持仅展示部分目标
-    is_show = kargs.get("is_show", [True]*80)
     classes = kargs.get("classes", None)
-    
-    if isinstance(img, str): 
-        image = cv2.imread(img)
-    else:
-        image = img
+    is_show = kargs.get("is_show", [True]*80)
+    cls_parent = kargs.get("cls_parent", [True]*80)
 
+    image = cv2.imread(img)
     H, W = image.shape[:2]
     ratio_h, ratio_w = kargs.get("scale_factor", [1, 1])
     padding_list = kargs.get("padding_list", [0]*4)
     pre_label = []
+    num = 0
     for box, label in zip(bboxes, labels):
         if not is_show[label]: continue
         if classes: 
@@ -104,7 +102,19 @@ def imshow_det(img, bboxes, labels, palette=colors, save_path=None, font_scale=0
         y0 = math.floor(min(max(y0 / ratio_h, 1), H - 1))
         x1 = math.ceil(min(max(x1 / ratio_w, 1), W - 1))
         y1 = math.ceil(min(max(y1 / ratio_h, 1), H - 1))
-        pre_label.append([x0, y0, x1, y1, cls])
+        
+        note = None
+        if cls_parent[label]:
+            image_crop = image[y0: y1, x0: x1]
+            root, img_name = osp.split(img)
+            save_crop_path = osp.join(root, "crop_img")
+            if not osp.exists(save_crop_path): os.makedirs(save_crop_path)
+            note = cls_parent[label]+f"_{H}_{W}"
+            cv2.imwrite(osp.join(save_crop_path, note+img_name), image_crop)
+            num += 1
+    
+        pre_label.append([x0, y0, x1, y1, cls, note])
+
         if save_path:
             if min(y1-y0, x1-x0) < 100: thickness = 2
             ((text_width, text_height), _) = cv2.getTextSize(
@@ -113,8 +123,7 @@ def imshow_det(img, bboxes, labels, palette=colors, save_path=None, font_scale=0
             if (x1 - x0) > text_width:
                 cv2.rectangle(image, (x0, y0), (x0 + text_width, y0 + int(1.3 * text_height)), (0, 0, 0), -1)
                 cv2.putText(image, cls, (x0, y0 + int(text_height)), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), lineType=cv2.LINE_AA)
-                    
-        if save_path and isinstance(img, str):
             if not osp.exists(save_path): os.makedirs(save_path)
             cv2.imwrite(osp.join(save_path, osp.split(img)[-1]), image)
+
     return pre_label

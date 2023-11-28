@@ -95,24 +95,29 @@ def read_cfg(prelabeling_map, args):
             if "Class_show" not in child[onnx_name].keys():
                 parent[onnx_name]["Class_show"] = {
                     "classes": [f"obj{i}" for i in range(num_classes)], 
-                    "is_show": [0]*num_classes
+                    "is_show": [0]*num_classes,
+                    "cls_parent": [0]*num_classes,
                 }
                 child[onnx_name]["Class_show"] = {
                     "classes": [f"obj{i}" for i in range(num_classes)], 
-                    "is_show": [0]*num_classes
+                    "is_show": [0]*num_classes,
+                    "cls_parent": [0]*num_classes,
                 }
 
             index = value["Class_index"][value["Used_classes"].index(cls)]
             if value["Parent"] == None: 
                 parent[onnx_name]["Class_show"]["classes"][index] = cls
                 parent[onnx_name]["Class_show"]["is_show"][index] = 1
+                parent[onnx_name]["Class_show"]["cls_parent"][index] = None
             else:
                 if value["Parent"][index] == None:
                     parent[onnx_name]["Class_show"]["classes"][index] = cls
                     parent[onnx_name]["Class_show"]["is_show"][index] = 1
+                    parent[onnx_name]["Class_show"]["cls_parent"][index] = None
                 else:
                     child[onnx_name]["Class_show"]["classes"][index] = cls
                     child[onnx_name]["Class_show"]["is_show"][index] = 1
+                    child[onnx_name]["Class_show"]["cls_parent"][index] = value["Parent"][value["Used_classes"].index(cls)]
 
     parent_map, child_map = [], []
     for _, map in parent.items():

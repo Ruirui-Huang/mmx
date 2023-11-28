@@ -75,20 +75,23 @@ class Prelabeling:
             "objects": []
         }
         obj_idx = 1
-        labels_od2 = []
+        labels_od2 = None
         for label in labels:
-            x0, y0, x1, y1, cls = label
-            obj_json = {
-                    "class": str(cls),
-                    "parent": [],
-                    "coord": [[x0, y0], [x1, y1]],
-                    "id": int(obj_idx),
-                    "shape": "rect",
-                    "props": {}
-            }
+            x0, y0, x1, y1, cls, cls_parent = label
+            if not cls_parent: 
+                labels_od2 = labels
+            else:
+                obj_json = {
+                        "class": str(cls),
+                        "parent": [],
+                        "coord": [[x0, y0], [x1, y1]],
+                        "id": int(obj_idx),
+                        "shape": "rect",
+                        "props": {}
+                }
             output_info["objects"].append(obj_json)
             obj_idx += 1
-        return [path_img, path_json, output_info, labels_od2]
+        return [output_info, labels_od2, path_json]
         
     def callback_merge_json(self, result):
         """一级od和二级od嵌套
@@ -96,14 +99,13 @@ class Prelabeling:
             result (list): 组成为[图片路径, 标注路径, 一级od标注信息, 二级od标注信息] 
         """
         # 存在二级od则匹配嵌套
-        # if not len(result[-1]):
-        #     fp = Findparent()
-        #     output_info = fp(result)
-        output_info = result[2]
-        path_json = result[1]
-        fileDir = osp.dirname(path_json)
+        if not len(result[-2]):
+            fp = Findparent(result[:-1])
+            output_info = fp()
+
+        fileDir = osp.dirname(result[-1])
         if not osp.exists(fileDir): os.makedirs(fileDir)
-        with open(path_json, 'w') as json_f:
+        with open(result[-1], 'w') as json_f:
             json.dump(output_info, json_f, indent=2, cls=Npencoder)
         json_f.close()
 

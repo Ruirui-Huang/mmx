@@ -23,9 +23,9 @@ def onnx_od(path_imgs, args, out_dir=None):
     assert args["Class_show"], print("class_show为空！")
     classes = args["Class_show"]["classes"]
     is_show = args["Class_show"]["is_show"]
+    cls_parent = args["Class_show"]["cls_parent"]
     num_classes = args["Num_classes"]
-    assert num_classes == len(classes) and  num_classes == len(is_show), print("类别长度不一致！")
-    colors=[[random.randint(0, 255) for _ in range(3)] for _ in range(num_classes)]
+    assert num_classes == len(classes) and  num_classes == len(is_show) and  num_classes == len(cls_parent), print("类别长度不一致！")
     if isinstance(path_imgs, str): path_imgs = path_to_list(path_imgs)
     preprocessor = Preprocess(fixed_scale=1)
     # 加载引擎
@@ -60,9 +60,10 @@ def onnx_od(path_imgs, args, out_dir=None):
 
         pre_label = imshow_det(
             path_img, bboxes, labels,
-            save_path=out_dir, 
+            save_path=out_dir,
+            classes=classes,  
             is_show=is_show, 
-            classes=classes, 
+            cls_parent=cls_parent,
             scale_factor=scale_factor,
             padding_list=padding_list)
 
@@ -81,8 +82,8 @@ if __name__ == '__main__':
         "Anchors": [[(9, 3), (6, 16), (26, 8)], [(15, 40), (32, 73), (63, 130)], [(91, 99), (190, 182),(339, 276)]],      
         "Class_show": {
                 "classes": ['Person', 'Plate', 'Car'], 
-                "is_show": [1, 1, 1]
-        },
-        "Parent": ["Car", None, None]
+                "is_show": [1, 1, 1],
+                "parent": ["Car", None, None]
+        }
     }
     onnx_od("./data", args, out_dir='./show')
