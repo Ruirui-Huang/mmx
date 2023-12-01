@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
-import json, os, shutil, copy
-from enum import Enum
+import json, os, shutil, copy, glob
 import os.path as osp
 import numpy as np
 from tqdm import tqdm
-import multiprocessing 
-from pathlib import Path
+import multiprocessing
 
 def multi_processing_pipeline(single_func, task_list, n_process=None, callback=None, **kw):
     """基于流水线思想的多进程处理。将单个任务放入进程池中，由系统调度哪个进程处理该任务
@@ -40,21 +38,6 @@ class Npencoder(json.JSONEncoder):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
 
-IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp')
-
-def path_to_list(path: str):
-    path = Path(path)
-    if path.is_file() and path.suffix in IMG_EXTENSIONS:
-        res_list = [str(path.absolute())]
-    elif path.is_dir():
-        res_list = [
-            str(p.absolute()) for p in path.iterdir()
-            if p.suffix in IMG_EXTENSIONS
-        ]
-    else:
-        raise RuntimeError
-    return res_list
-
 def read_cfg(prelabeling_map, args):
     """模型库解析拆分一级OD和二级OD
     Args:
@@ -71,6 +54,7 @@ def read_cfg(prelabeling_map, args):
         'ppyoloe', 
         'ppyoloep'
     ]
+    classes_parent = set()
     parent, child = {}, {}
     for cls, is_used in args.items():
         for onnx_name, value in prelabeling_map.items():
@@ -96,32 +80,32 @@ def read_cfg(prelabeling_map, args):
                 parent[onnx_name]["Class_show"] = {
                     "classes": [f"obj{i}" for i in range(num_classes)], 
                     "is_show": [0]*num_classes,
-                    "cls_parent": [0]*num_classes,
+                    "exist_child": [0]*num_classes,
                 }
                 child[onnx_name]["Class_show"] = {
                     "classes": [f"obj{i}" for i in range(num_classes)], 
                     "is_show": [0]*num_classes,
-                    "cls_parent": [0]*num_classes,
+                    "exist_child": [0]*num_classes,
                 }
 
             index = value["Class_index"][value["Used_classes"].index(cls)]
             if value["Parent"] == None: 
                 parent[onnx_name]["Class_show"]["classes"][index] = cls
                 parent[onnx_name]["Class_show"]["is_show"][index] = 1
-                parent[onnx_name]["Class_show"]["cls_parent"][index] = None
             else:
                 if value["Parent"][index] == None:
                     parent[onnx_name]["Class_show"]["classes"][index] = cls
                     parent[onnx_name]["Class_show"]["is_show"][index] = 1
-                    parent[onnx_name]["Class_show"]["cls_parent"][index] = None
                 else:
                     child[onnx_name]["Class_show"]["classes"][index] = cls
                     child[onnx_name]["Class_show"]["is_show"][index] = 1
-                    child[onnx_name]["Class_show"]["cls_parent"][index] = value["Parent"][value["Used_classes"].index(cls)]
+                    classes_parent.add(value["Parent"][index])
+
 
     parent_map, child_map = [], []
     for _, map in parent.items():
         if not sum(map["Class_show"]["is_show"]): continue
+        map["Class_show"]["exist_child"] = [int(i in classes_parent) for i in map["Class_show"]["classes"]]
         parent_map.append(map)
 
     for _, map in child.items():
@@ -139,7 +123,7 @@ def deal_unlabeled_sample(path_imgs, path_jsons=None, remove=False, save_path=No
         save_path (str): 存储没有标注结果的图片
     Returns: 
     """
-    if isinstance(path_imgs, str): path_imgs = path_to_list(path_imgs)
+    if isinstance(path_imgs, str): path_imgs = glob.glob(osp.join(path_imgs, "*.jpg"))
     p_bar = tqdm(path_imgs, ncols=100)
     p_bar.set_description("Unlabeled data Processing")
     for path_img in path_imgs:

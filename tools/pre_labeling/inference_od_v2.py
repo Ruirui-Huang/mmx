@@ -7,7 +7,7 @@ import pandas as pd
 from tqdm import tqdm
 from multiprocessing import Pool
 from mmengine.config import Config
-from utils import onnx_od, read_cfg, deal_unlabeled_sample, imshow_det, Npencoder, Findparent
+from utils import onnx_od, read_cfg, deal_unlabeled_sample, imshow_det, Npencoder
 
 def getArgs():
     """
@@ -40,7 +40,7 @@ class Prelabeling:
         for m in onnx_map:
             pool.apply_async(
                 func=onnx_od, 
-                args=(self.path_imgs, m, ), 
+                args=(path_imgs, m, ), 
                 callback=self.callback_merge_labels)
         pool.close()
         pool.join()
@@ -62,7 +62,7 @@ class Prelabeling:
         """预标注结果写入
         Args:
             info (dict):   图片基本信息
-            labels (list): 预标结果，其中各元素的组成为[左上角横坐标, 左上角纵坐标, 右下角横坐标, 右下角纵坐标, 类别, 父级类别]
+            labels (list): 预标结果，其中各元素的组成为[左上角横坐标, 左上角纵坐标, 右下角横坐标, 右下角纵坐标, 类别, 父级信息]
         """
         path_img = info["file"]
         path_json = info["json"].replace(self.inputInfo["markDataInPath"], self.inputInfo["markDataOutPath"])
@@ -75,61 +75,70 @@ class Prelabeling:
             "objects": []
         }
         obj_idx = 1
-        labels_od2 = None
+        parent_id_map = dict()
         for label in labels:
-            x0, y0, x1, y1, cls, cls_parent = label
-            if not cls_parent: 
-                labels_od2 = labels
-            else:
-                obj_json = {
-                        "class": str(cls),
-                        "parent": [],
-                        "coord": [[x0, y0], [x1, y1]],
-                        "id": int(obj_idx),
-                        "shape": "rect",
-                        "props": {}
-                }
+            x0, y0, x1, y1, cls, note = label
+            if note: continue
+            parent_id_map[f"{cls}_{x0}_{y0}_{x1}_{y1}"] = [cls, obj_idx]
+            obj_json = {
+                "class": str(cls),
+                "parent": [],
+                "coord": [[x0, y0], [x1, y1]],
+                "id": obj_idx,
+                "shape": "rect",
+                "props": {}
+            }
             output_info["objects"].append(obj_json)
             obj_idx += 1
-        return [output_info, labels_od2, path_json]
+        return [path_json, obj_idx, output_info, parent_id_map, labels]
         
     def callback_merge_json(self, result):
         """一级od和二级od嵌套
         Args:
-            result (list): 组成为[图片路径, 标注路径, 一级od标注信息, 二级od标注信息] 
+            result (list): 组成为[标注路径, 一级od目标数量, 一级od标注信息, 二级od标注信息, 预标结果] 
         """
-        # 存在二级od则匹配嵌套
-        if not len(result[-2]):
-            fp = Findparent(result[:-1])
-            output_info = fp()
-
-        fileDir = osp.dirname(result[-1])
+        obj_idx = result[1]
+        for label in result[4]:
+            x0, y0, x1, y1, cls, note = label
+            if not note: continue
+            cls_parent, value = osp.split("_")
+            cls_parent, id_parent = result[3][note]
+            obj_json = {
+                "class": str(cls_parent),
+                "parent": [id_parent],
+                "coord": [[x0, y0], [x1, y1]],
+                "id": obj_idx,
+                "shape": "rect",
+                "props": {cls_parent: value}
+            }
+            result[2]["objects"].append(obj_json)
+            obj_idx += 1
+        fileDir = osp.dirname(result[0])
         if not osp.exists(fileDir): os.makedirs(fileDir)
-        with open(result[-1], 'w') as json_f:
-            json.dump(output_info, json_f, indent=2, cls=Npencoder)
+        with open(result[0], 'w') as json_f:
+            json.dump(result[2], json_f, indent=2, cls=Npencoder)
         json_f.close()
 
     def show(self):
         """预标注结果可视化
         """
-        p_bar = tqdm(self.path_imgs, ncols=100)
+        p_bar = tqdm(self.df, ncols=100)
         p_bar.set_description('Drawing')
-        for path_img in self.path_imgs:
+        for _, row in self.df.iterrows():
             p_bar.update()
-            index = self.df['path_img'][self.df['path_img'].values == path_img].index
-            llabels = self.df.loc[index, 'labels'].values
-            if not len(llabels): continue
-            bboxes = [label[:4] for label in llabels[0]]
-            classes = list(set([label[4] for label in llabels[0]]))
-            labels = [classes.index(label[4]) for label in llabels[0]]
+            path_img = row['path_img']
+            labels = row['labels']
+            if not len(labels): continue
+            bboxes = [label[:4] for label in labels]
+            classes = list(set([label[4] for label in labels]))
+            llabels = [classes.index(label[4]) for label in labels]
             imshow_det(
-                path_img, bboxes, labels, 
-                classes=[label[4] for label in llabels[0]], 
+                path_img, bboxes, llabels, 
+                classes=classes, 
                 save_path=osp.join(osp.dirname(osp.dirname(path_img)), 'show')
             )
         p_bar.close()
 
-        
     def run(self):
         cfg = Config.fromfile('./utils/config.py')
         prelabeling_map = cfg.get('prelabeling_map', None)
@@ -141,7 +150,7 @@ class Prelabeling:
         # 二级OD
         if len(child_map):
             self.onnx_inference(osp.join(osp.dirname(self.path_imgs[0]), "crop_imgs"), child_map)
-
+        
         # 生成dahuajson
         pool = Pool(self.nproc)
         for info in self.info:

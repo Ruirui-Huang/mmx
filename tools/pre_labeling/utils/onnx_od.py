@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import math
 import random
+import glob
 import os.path as osp
 import onnxruntime as ort
 from tqdm import tqdm
@@ -10,7 +11,6 @@ from argparse import ArgumentParser
 from .preprocess import Preprocess
 from .decoder import Decoder
 from .nms import non_max_suppression
-from .utils import path_to_list
 from .show_result import imshow_det
 
 
@@ -23,10 +23,12 @@ def onnx_od(path_imgs, args, out_dir=None):
     assert args["Class_show"], print("class_show为空！")
     classes = args["Class_show"]["classes"]
     is_show = args["Class_show"]["is_show"]
-    cls_parent = args["Class_show"]["cls_parent"]
+    exist_child = args["Class_show"]["exist_child"]
     num_classes = args["Num_classes"]
-    assert num_classes == len(classes) and  num_classes == len(is_show) and  num_classes == len(cls_parent), print("类别长度不一致！")
-    if isinstance(path_imgs, str): path_imgs = path_to_list(path_imgs)
+    assert num_classes == len(classes) and  \
+        num_classes == len(is_show) and  \
+            num_classes == len(exist_child), print("类别长度不一致！")
+    if isinstance(path_imgs, str): path_imgs = glob.glob(osp.join(path_imgs, "*.jpg"))
     preprocessor = Preprocess(fixed_scale=1)
     # 加载引擎
     sess = ort.InferenceSession(args["Path_onnx"], providers=['CUDAExecutionProvider'])
@@ -58,12 +60,12 @@ def onnx_od(path_imgs, args, out_dir=None):
             args["Score_thr"],
             args["Box_thr"],)
 
-        pre_label = imshow_det(
+        path_img, pre_label = imshow_det(
             path_img, bboxes, labels,
             save_path=out_dir,
             classes=classes,  
             is_show=is_show, 
-            cls_parent=cls_parent,
+            exist_child=exist_child,
             scale_factor=scale_factor,
             padding_list=padding_list)
 
@@ -83,7 +85,7 @@ if __name__ == '__main__':
         "Class_show": {
                 "classes": ['Person', 'Plate', 'Car'], 
                 "is_show": [1, 1, 1],
-                "parent": ["Car", None, None]
+                "exist_child": [0, 0, 0]
         }
     }
     onnx_od("./data", args, out_dir='./show')
