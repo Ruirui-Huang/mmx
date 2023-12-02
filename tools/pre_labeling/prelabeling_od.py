@@ -7,7 +7,7 @@ import pandas as pd
 from tqdm import tqdm
 from multiprocessing import Pool
 from mmengine.config import Config
-from utils import onnx_od, read_cfg, deal_unlabeled_sample, imshow_det, Npencoder
+from utils import inference, read_cfg, deal_unlabeled_sample, imshow_det, Npencoder
 
 def getArgs():
     """
@@ -39,7 +39,7 @@ class Prelabeling:
         pool = Pool(self.nproc)
         for m in onnx_map:
             pool.apply_async(
-                func=onnx_od, 
+                func=inference, 
                 args=(path_imgs, m, ), 
                 callback=self.callback_merge_labels)
         pool.close()

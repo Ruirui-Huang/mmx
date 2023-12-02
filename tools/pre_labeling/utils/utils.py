@@ -41,7 +41,7 @@ class Npencoder(json.JSONEncoder):
 def read_cfg(prelabeling_map, args):
     """模型库解析拆分一级OD和二级OD
     Args:
-        prelabeling_map (dict): 模型库。以onnx名称作为键值，存储onnx的详细信息
+        prelabeling_map (dict): 模型库。以model名称作为键值，存储model的详细信息
         args (dict): 需要预标的目标类别信息
     """
     ModelType = [
@@ -57,7 +57,7 @@ def read_cfg(prelabeling_map, args):
     classes_parent = set()
     parent, child = {}, {}
     for cls, is_used in args.items():
-        for onnx_name, value in prelabeling_map.items():
+        for model_name, value in prelabeling_map.items():
             if cls not in value["Used_classes"] or not is_used: continue
             num_classes = value["Num_classes"]
             assert value["Model_type"] in ModelType  and \
@@ -71,18 +71,18 @@ def read_cfg(prelabeling_map, args):
             max(value["Class_index"]) < num_classes and \
             (value["Parent"] == None or len(value["Parent"]) == len(value["Used_classes"])), print("请检查config配置！")
 
-            value["Path_onnx"] = osp.join("./model_zoo", onnx_name + ".onnx")
-            if onnx_name not in parent.keys():
-                child[onnx_name] = copy.copy(value)
-                parent[onnx_name] = copy.copy(value)
+            value["Path_model"] = osp.join("./model_zoo", model_name + "." + value["Weight_type"])
+            if model_name not in parent.keys():
+                child[model_name] = copy.copy(value)
+                parent[model_name] = copy.copy(value)
 
-            if "Class_show" not in child[onnx_name].keys():
-                parent[onnx_name]["Class_show"] = {
+            if "Class_show" not in child[model_name].keys():
+                parent[model_name]["Class_show"] = {
                     "classes": [f"obj{i}" for i in range(num_classes)], 
                     "is_show": [0]*num_classes,
                     "exist_child": [0]*num_classes,
                 }
-                child[onnx_name]["Class_show"] = {
+                child[model_name]["Class_show"] = {
                     "classes": [f"obj{i}" for i in range(num_classes)], 
                     "is_show": [0]*num_classes,
                     "exist_child": [0]*num_classes,
@@ -90,15 +90,15 @@ def read_cfg(prelabeling_map, args):
 
             index = value["Class_index"][value["Used_classes"].index(cls)]
             if value["Parent"] == None: 
-                parent[onnx_name]["Class_show"]["classes"][index] = cls
-                parent[onnx_name]["Class_show"]["is_show"][index] = 1
+                parent[model_name]["Class_show"]["classes"][index] = cls
+                parent[model_name]["Class_show"]["is_show"][index] = 1
             else:
                 if value["Parent"][index] == None:
-                    parent[onnx_name]["Class_show"]["classes"][index] = cls
-                    parent[onnx_name]["Class_show"]["is_show"][index] = 1
+                    parent[model_name]["Class_show"]["classes"][index] = cls
+                    parent[model_name]["Class_show"]["is_show"][index] = 1
                 else:
-                    child[onnx_name]["Class_show"]["classes"][index] = cls
-                    child[onnx_name]["Class_show"]["is_show"][index] = 1
+                    child[model_name]["Class_show"]["classes"][index] = cls
+                    child[model_name]["Class_show"]["is_show"][index] = 1
                     classes_parent.add(value["Parent"][index])
 
 

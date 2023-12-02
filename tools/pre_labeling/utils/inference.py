@@ -5,6 +5,7 @@ import math
 import random
 import glob
 import os.path as osp
+import caffe
 import onnxruntime as ort
 from tqdm import tqdm
 from argparse import ArgumentParser
@@ -14,10 +15,10 @@ from .nms import non_max_suppression
 from .show_result import imshow_det
 
 
-def onnx_od(path_imgs, args, out_dir=None):
-    """ONNX前向，用于目标检测推理
+def inference(path_imgs, args, out_dir=None):
+    """MODEL前向，用于目标检测推理
     Args:
-        args (dict): onnx参数
+        args (dict): model参数
         out_dir: 推理结果可视化存储路径
     """
     assert args["Class_show"], print("class_show为空！")
@@ -30,15 +31,22 @@ def onnx_od(path_imgs, args, out_dir=None):
             num_classes == len(exist_child), print("类别长度不一致！")
     if isinstance(path_imgs, str): path_imgs = glob.glob(osp.join(path_imgs, "*.jpg"))
     preprocessor = Preprocess(fixed_scale=1)
-    # 加载引擎
-    sess = ort.InferenceSession(args["Path_onnx"], providers=['CUDAExecutionProvider'])
     decoder = Decoder(model_type=args["Model_type"], model_only=True)
-    input_name = sess.get_inputs()[0].name
-    input_size = sess.get_inputs()[0].shape[-2:]
+    # 加载引擎
+    if args["Model_type"] == "onnx":
+        sess = ort.InferenceSession(args["Path_model"], providers=['CUDAExecutionProvider'])
+        input_name = sess.get_inputs()[0].name
+        input_size = sess.get_inputs()[0].shape[-2:]
+    elif args["Model_type"] == "caffe":
+        caffe.set_mode_gpu()
+        caffe.set_device(0)
+        net = caffe.Net(args["Path_model"].replace(".caffemodel", ".prototxt"), args["Path_model"], caffe.TEST)
+    else:
+        print("目前仅支持onnx和caffemodel推理！\n")
 
     result = dict()
     p_bar = tqdm(path_imgs, ncols=100)
-    p_bar.set_description(f'{osp.split(args["Path_onnx"])[-1]} Processing')
+    p_bar.set_description(f'{osp.split(args["Path_model"])[-1]} Processing')
     for path_img in path_imgs: 
         p_bar.update()
         image = cv2.imread(path_img)
@@ -46,7 +54,11 @@ def onnx_od(path_imgs, args, out_dir=None):
         # 数据预处理
         img, scale_factor, padding_list = preprocessor(image, input_size)
         # 推理
-        features = sess.run(None, {input_name: img})
+        if args["Model_type"] == "onnx":
+            features = sess.run(None, {input_name: img})
+        elif args["Model_type"] == "caffe":
+            features = net.forward(data=img)
+
         # 后处理
         decoder_outputs = decoder(
             features,
@@ -76,7 +88,7 @@ def onnx_od(path_imgs, args, out_dir=None):
 
 if __name__ == '__main__':
     args = {
-        "Path_onnx": "./model.onnx",
+        "Path_model": "./model.onnx", 
         "Model_type": "yolov5",
         "Num_classes": 3,
         "Score_thr": 0.3,
@@ -88,4 +100,4 @@ if __name__ == '__main__':
                 "exist_child": [0, 0, 0]
         }
     }
-    onnx_od("./data", args, out_dir='./show')
+    inference("./data", args, out_dir='./show')
