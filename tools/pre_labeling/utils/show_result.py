@@ -86,11 +86,12 @@ def imshow_det(path_img, bboxes, llabels, palette=colors, save_path=None, font_s
     padding_list = kargs.get("padding_list", [0]*4)
     ratio_h, ratio_w = kargs.get("scale_factor", [1, 1])
 
+    note = None
     root, img = osp.split(path_img)
     image = cv2.imread(path_img)
     H, W = image.shape[:2]
 
-    note = None
+    # 如果是抠图的检测结果，解析图片路径中的父级信息，便于子级坐标转换
     if "crop_imgs" in root:
         img_name_new = img.split("_")
         img_name = "_".join(img_name_new[:-6])
@@ -99,8 +100,8 @@ def imshow_det(path_img, bboxes, llabels, palette=colors, save_path=None, font_s
         y0_parent = int(img_name_new[-4])
         x1_parent = int(img_name_new[-3])
         y1_parent = int(img_name_new[-2])
+        # 预测结果附带上父级，便于写入json时找父级id
         note = f"{cls_parent}_{x0_parent}_{y0_parent}_{x1_parent}_{y1_parent}"
-        path_img = osp.join(osp.dirname(root), img_name + ".jpg")
 
     pre_label = []
     for box, label in zip(bboxes, llabels):
@@ -110,12 +111,14 @@ def imshow_det(path_img, bboxes, llabels, palette=colors, save_path=None, font_s
         else:
             cls = str(label)
 
+        # 按数据预处理方式，将检测结果逆向转换到原图坐标系
         x0, y0, x1, y1 = box - np.array([padding_list[2], padding_list[0], padding_list[2], padding_list[0]])
         x0 = math.floor(min(max(x0 / ratio_w, 1), W - 1))
         y0 = math.floor(min(max(y0 / ratio_h, 1), H - 1))
         x1 = math.ceil(min(max(x1 / ratio_w, 1), W - 1))
         y1 = math.ceil(min(max(y1 / ratio_h, 1), H - 1))
         
+        # 如果存在子级，抠图并保存，图片路径包含抠图信息
         if exist_child[label]:
             image_crop = image[y0:y1, x0:x1]
             img_name, _ = osp.splitext(img)
@@ -123,7 +126,8 @@ def imshow_det(path_img, bboxes, llabels, palette=colors, save_path=None, font_s
             if not osp.exists(path_crop_imgs): os.makedirs(path_crop_imgs)
             img_name_new = img_name + f"_{cls}_{x0}_{y0}_{x1}_{y1}_.jpg"
             cv2.imwrite(osp.join(path_crop_imgs, img_name_new), image_crop)
-            
+        
+        # 如果是抠图的检测结果，将检测结果转换到原图坐标系
         if "crop_imgs" in root:
             x0 = x0 + x0_parent
             y0 = y0 + y0_parent
@@ -143,4 +147,6 @@ def imshow_det(path_img, bboxes, llabels, palette=colors, save_path=None, font_s
             if not osp.exists(save_path): os.makedirs(save_path)
             cv2.imwrite(osp.join(save_path, img), image)
 
+    path_img = osp.join(osp.dirname(root), img_name + ".jpg")
+    
     return path_img, pre_label

@@ -48,7 +48,7 @@ class Prelabeling:
     def callback_merge_labels(self, result):
         """预标注结果合并
         Args:
-            result (dict): 预标注结果。key为图片路径, value为图片对应的所有标注结果
+            result (dict): 预标注结果。key为图片路径，value为图片对应的所有标注信息
         """
         for path_img, labels in result.items():
             if not len(labels): print(f"{path_img}中不存在目标！")
