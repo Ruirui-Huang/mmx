@@ -9,13 +9,10 @@ def softmax(x: ndarray, axis: int = -1) -> ndarray:
     y = e_x / e_x.sum(axis=axis, keepdims=True)
     return y
 
-
 def sigmoid(x: ndarray) -> ndarray:
     return 1. / (1. + np.exp(-x))
 
-
 class Decoder:
-
     def __init__(self, model_type: ModelType, model_only: bool = False):
         self.model_type = model_type
         self.model_only = model_only

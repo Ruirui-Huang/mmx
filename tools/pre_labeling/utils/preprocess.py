@@ -14,6 +14,7 @@ class Preprocess:
         self.mean = np.array([0, 0, 0], dtype=np.float32).reshape((3, 1, 1))
         self.std = np.array([255, 255, 255], dtype=np.float32).reshape((3, 1, 1))
         self.fixed_scale = fixed_scale
+        assert color_space in ["rgb", "bgr"], print("数据颜色空间仅支持rgb和bgr！\n")
         self.is_rgb = True if color_space == "rgb" else False
 
     def __call__(self, image, new_size):
@@ -23,6 +24,7 @@ class Preprocess:
             new_size (list): onnx输入大小 H, W
         """
         assert 0 <= self.fixed_scale <=3, print(f"缩放方式{self.fixed_scale}不支持！")
+        if self.is_rgb: image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         height, width = image.shape[:2]
         height_new, width_new = new_size
         padding_list = [0]*4

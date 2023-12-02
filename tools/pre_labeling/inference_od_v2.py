@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, argparse, json, warnings
+import os, argparse, json, shutil, warnings
 warnings.filterwarnings("ignore")
 import cv2
 import os.path as osp
@@ -149,7 +149,9 @@ class Prelabeling:
 
         # 二级OD
         if len(child_map):
-            self.onnx_inference(osp.join(osp.dirname(self.path_imgs[0]), "crop_imgs"), child_map)
+            path_imgs = osp.join(osp.dirname(self.path_imgs[0]), "crop_imgs")
+            self.onnx_inference(path_imgs, child_map)
+            shutil.rmtree(path_imgs)
         
         # 生成dahuajson
         pool = Pool(self.nproc)
@@ -165,6 +167,7 @@ class Prelabeling:
             )
         pool.close()
         pool.join()
+        
 
         # 线下预标开启看效果，以及没有标注结果的情况
         if bool(self.inputInfo["args"]["show_result"]):
