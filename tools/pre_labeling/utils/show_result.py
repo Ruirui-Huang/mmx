@@ -11,7 +11,7 @@ def imshow_semantic(img, seg, label=None, palette=colors, save_path=None, opacit
     Args:
         img (str | ndarray): 图片路径 or 图片数据
         seg (ndarray): 原图坐标系下的分割掩码结果
-        mask (ndarray): 掩码GT
+        label (ndarray): 掩码GT
         palette (list): 各类别颜色
         save_path (str): 可视化结果存储路径
         opacity (float): 透明度 0 ~ 1

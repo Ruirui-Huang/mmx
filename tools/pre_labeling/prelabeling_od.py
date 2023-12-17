@@ -7,7 +7,7 @@ import pandas as pd
 from tqdm import tqdm
 from multiprocessing import Pool
 from mmengine.config import Config
-from utils import inference, read_cfg, deal_unlabeled_sample, imshow_det, Npencoder
+from utils import inference_od, read_cfg, deal_unlabeled_sample, imshow_det, Npencoder
 
 def getArgs():
     """
@@ -39,7 +39,7 @@ class Prelabeling:
         pool = Pool(self.nproc)
         for m in onnx_map:
             pool.apply_async(
-                func=inference, 
+                func=inference_od, 
                 args=(path_imgs, m, ), 
                 callback=self.callback_merge_labels)
         pool.close()
@@ -101,7 +101,7 @@ class Prelabeling:
         for label in result[4]:
             x0, y0, x1, y1, cls, note = label
             if not note: continue
-            cls_parent, value = osp.split("_")
+            cls, value = cls.split("_")
             cls_parent, id_parent = result[3][note]
             obj_json = {
                 "class": str(cls_parent),
@@ -109,7 +109,7 @@ class Prelabeling:
                 "coord": [[x0, y0], [x1, y1]],
                 "id": obj_idx,
                 "shape": "rect",
-                "props": {cls_parent: value}
+                "props": {cls: value}
             }
             result[2]["objects"].append(obj_json)
             obj_idx += 1

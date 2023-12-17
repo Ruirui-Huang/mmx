@@ -8,7 +8,6 @@ import os.path as osp
 import caffe
 import onnxruntime as ort
 from tqdm import tqdm
-from argparse import ArgumentParser
 from .preprocess import Preprocess
 from .decoder import Decoder
 from .nms import non_max_suppression
@@ -49,6 +48,7 @@ def inference(path_imgs, args, out_dir=None):
     p_bar.set_description(f'{osp.split(args["Path_model"])[-1]} Processing')
     for path_img in path_imgs: 
         p_bar.update()
+        if osp.splitext(path_img)[-1] != ".jpg": continue
         image = cv2.imread(path_img)
         H, W = image.shape[:2]
         # 数据预处理
