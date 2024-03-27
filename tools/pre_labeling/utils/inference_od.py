@@ -37,9 +37,9 @@ def inference(path_imgs, args, out_dir=None):
         input_name = sess.get_inputs()[0].name
         input_size = sess.get_inputs()[0].shape[-2:]
     elif args["Model_type"] == "caffe":
-        caffe.set_mode_gpu()
-        caffe.set_device(0)
-        net = caffe.Net(args["Path_model"].replace(".caffemodel", ".prototxt"), args["Path_model"], caffe.TEST)
+        net = caffe.Net(args["Path_model"].replace('.caffemodel', '.prototxt'), args["Path_model"], caffe.TEST)  # 加载模型结构和权重
+        input_name = net.inputs[0]  # 获取输入名称
+        input_size = net.blobs[input_name].data.shape[-2:]
     else:
         print("目前仅支持onnx和caffemodel推理！\n")
 
@@ -57,7 +57,9 @@ def inference(path_imgs, args, out_dir=None):
         if args["Model_type"] == "onnx":
             features = sess.run(None, {input_name: img})
         elif args["Model_type"] == "caffe":
-            features = net.forward(data=img)
+            net.blobs[input_name].data[...] = img
+            output = net.forward()
+            features = output[net.outputs[0]]
 
         # 后处理
         decoder_outputs = decoder(
