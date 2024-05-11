@@ -1,5 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from mmx.models.xtors import YOLODetector as BaseYOLODetector
+from mmyolo.models.detectors import YOLODetector as BaseYOLODetector
 from mmseg.models.segmentors import EncoderDecoder as BaseEncoderDecoder
 from mmx.registry import MODELS
 
@@ -37,7 +37,7 @@ class YOLODetector(BaseYOLODetector):
         
 @MODELS.register_module()
 class EncoderDecoder(BaseEncoderDecoder):
-     def forward_dummy(self, inputs):
+    def forward_dummy(self, inputs):
         """
         Args:
             inputs (Tensor): Inputs with shape (N, C, H, W).
@@ -46,7 +46,7 @@ class EncoderDecoder(BaseEncoderDecoder):
         """
         x = self.extract_feat(inputs)
         return self.decode_head.forward(x)
-
+     
     def forward_particular(self, inputs):
         batch_img_metas = [
             dict(

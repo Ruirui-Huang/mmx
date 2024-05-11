@@ -1,5 +1,5 @@
-from .xcv_bricks import RepBasicBlock
+from .xcv_bricks import AttentionBlock, RepBasicBlock, SPPFBottleneck, CSPRegLayer
 
 __all__ = [
-    'RepBasicBlock'
+    'AttentionBlock', 'RepBasicBlock', 'SPPFBottleneck', 'CSPRegLayer'
 ]

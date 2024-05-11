@@ -4,8 +4,7 @@ import torch.nn as nn
 from mmcv.cnn import build_norm_layer
 from mmseg.models.decode_heads import FCNHead
 from mmx.registry import MODELS
-from ..ops import DeconvModule
-
+from ..utils import DeconvModule
 
 @MODELS.register_module()
 class SegFCNHead(FCNHead):

@@ -43,3 +43,8 @@ load_from = None
 
 # whether to resume training from the loaded checkpoint
 resume = False
+
+backend_args = None
+
+val_cfg = dict(type='ValLoop')
+test_cfg = dict(type='TestLoop')

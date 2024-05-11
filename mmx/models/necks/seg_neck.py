@@ -7,7 +7,7 @@ from torch.nn.modules.batchnorm import _BatchNorm
 
 from mmx.registry import MODELS
 
-from ..ops import DeconvModule
+from ..utils import DeconvModule
 
 
 class AdapterConv(BaseModule):

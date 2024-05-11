@@ -5,7 +5,7 @@ import torch.nn as nn
 from mmcv.cnn import ConvModule
 from mmdet.utils import ConfigType, OptConfigType, OptMultiConfig
 from mmengine.model import BaseModule
-from mmx.models.backbones import BaseBackbone
+from mmyolo.models.backbones import BaseBackbone
 from mmx.models.layers import SPPFBottleneck, CSPRegLayer
 from mmx.registry import MODELS
 

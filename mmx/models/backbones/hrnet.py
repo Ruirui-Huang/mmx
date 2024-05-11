@@ -5,7 +5,7 @@ from mmcv.cnn import build_conv_layer, build_norm_layer, build_upsample_layer
 from mmengine.model import BaseModule, ModuleList, Sequential
 from mmengine.utils.dl_utils.parrots_wrapper import _BatchNorm
 from mmseg.models.backbones.resnet import BasicBlock, Bottleneck
-from ..ops import DeconvModule
+from ..utils import DeconvModule
 
 from mmx.registry import MODELS
 

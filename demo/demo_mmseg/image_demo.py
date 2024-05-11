@@ -255,6 +255,8 @@ def main():
     pool = ctx.Pool(args.nproc if num_tasks > args.nproc else num_tasks)
 
     prog_bar = ProgressBar(num_tasks, num_tasks, True, file=sys.stdout)
+
+
     for img in imglist:
         img_path = osp.join(args.imgs, img)
         image, mask = get_data(img_path, args.GT, args.roi)
