@@ -8,9 +8,9 @@ import numpy as np
 from mmengine import Config
 from mmengine.runner import Runner, load_checkpoint
 from mmengine.model import is_model_wrapper
-from mmx.models import RepVGGBlock
-from merge_bn import fuse_bn_recursively
 sys.path.append(osp.dirname(osp.dirname(osp.realpath(__file__))))
+from mmyolo.models import RepVGGBlock
+# from merge_bn import fuse_bn_recursively
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Convert MM model to ONNX')
@@ -19,7 +19,7 @@ def parse_args():
     parser.add_argument('--show', action='store_true', help='show onnx graph')
     parser.add_argument('--caffe', action='store_true', help='Whether to convert caffe.')
     parser.add_argument('--opset-version', type=int, default=12)
-    parser.add_argument('--simplify', action='store_true', help='Whether to simplify onnx model.')
+    parser.add_argument('--simplify', action='store_true', help='Whether to simplify onnx model.', default=True)
     parser.add_argument('--dynamic-export',
                         action='store_true',
                         help='Whether to export ONNX with dynamic input shape. \
@@ -175,7 +175,7 @@ if __name__ == '__main__':
     # 减少不必要的日志打印
     cfg.log_level = 'ERROR'
     # cfg.load_from = args.checkpoint
-    input_size = cfg.get('img_scale', None)
+    input_size = cfg.get('input_size', None)
     # 判断当前任务的前向方式
     forward_particular = cfg.get('forward_particular', None)
     print(f'The current network input size is {input_size}')
@@ -193,7 +193,7 @@ if __name__ == '__main__':
         load_checkpoint(model, args.checkpoint, map_location='cpu')
 
     switch_to_deploy(model)
-    model = fuse_bn_recursively(model)
+    # model = fuse_bn_recursively(model)
        
     default_scope = cfg.default_scope
     if "cls" in default_scope:

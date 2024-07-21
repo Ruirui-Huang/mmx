@@ -1,8 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import argparse
 import logging
-import os
-import sys
+import os, sys
 import os.path as osp
 from copy import deepcopy
 # from importlib import import_module
@@ -13,13 +12,12 @@ from mmengine.registry import RUNNERS
 from mmengine.runner import Runner
 from mmengine.utils import digit_version
 from mmengine.utils.dl_utils import TORCH_VERSION
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a visual task')
 
-    parser.add_argument('config', help='train config file path')
+    parser.add_argument('--config', help='train config file path', default=r"D:\github\mmx\configs\seg\test_v5.py")
     parser.add_argument('--work-dir', help='the dir to save logs and models')
     parser.add_argument('--resume',
                         nargs='?',

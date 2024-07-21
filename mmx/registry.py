@@ -51,7 +51,7 @@ DATA_SAMPLERS = Registry(
 TRANSFORMS = Registry(
     'transform',
     parent=MMENGINE_TRANSFORMS,
-    locations=['mmx.transforms'])
+    locations=['mmx.datasets'])
 
 # manage all kinds of modules inheriting `nn.Module`
 MODELS = Registry('model', parent=MMENGINE_MODELS, locations=['mmx.models'])

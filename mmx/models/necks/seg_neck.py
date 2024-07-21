@@ -189,7 +189,7 @@ class FEINetUpHead(BaseModule):
         'P4S': [[64, 64, 128, 256]],
         'P4M': [[64, 96, 160, 320]],
         'P4B': [[64, 128, 192, 320]],
-        'P5': [[96, 128, 160, 320]]
+        'P5': [[64, 128, 256, 512]]
     }
 
     def __init__(self,
@@ -204,6 +204,73 @@ class FEINetUpHead(BaseModule):
                  act_cfg=dict(type='ReLU'),
                  init_cfg=None):
         super(FEINetUpHead, self).__init__(init_cfg)
+        self.freeze_all = freeze_all
+        arch_setting = self.arch_settings[arch]
+        in_channels = [int(in_channel * widen_factor) for in_channel in arch_setting[0]]
+        layers = []
+        if head_type.startswith("L"):
+            base_chans = [64, 128, 256, 512]
+        elif head_type.startswith("M"):
+            base_chans = [64, 128, 128, 256]
+        elif head_type.startswith("S"):
+            base_chans = [128, 128, 128, 128]
+
+        if use_adapter_conv:
+            layers.append(AdapterConv(in_channels, base_chans, norm_cfg=norm_cfg, act_cfg=act_cfg))
+            in_channels = base_chans[:]
+
+        if head_type == "L":
+            layers.append(UpBranch(in_channels, multicat=multicat, norm_cfg=norm_cfg, act_cfg=act_cfg))
+        elif head_type == "M":
+            layers.append(UpBranch(in_channels, [96, 96, 64, 32], multicat=multicat, norm_cfg=norm_cfg, act_cfg=act_cfg))
+        elif head_type == "S":
+            layers.append(UpBranch(in_channels, [128, 32, 16, 16], multicat=multicat, norm_cfg=norm_cfg, act_cfg=act_cfg))
+        else:
+            raise ValueError(f"Unknown FEINetUpHead type {head_type}")
+
+        self.layers = nn.Sequential(*layers)
+        self._freeze_all()
+
+    def _freeze_all(self):
+        """Freeze the model."""
+        if self.freeze_all:
+            for m in self.modules():
+                if isinstance(m, _BatchNorm):
+                    m.eval()
+                for param in m.parameters():
+                    param.requires_grad = False
+
+    def train(self, mode=True):
+        """Convert the model into training mode while keep the normalization
+        layer freezed."""
+        super().train(mode)
+        self._freeze_all()
+
+    def forward(self, x):
+        return self.layers(x)
+
+
+@MODELS.register_module()
+class FEINetUpHeadv2(BaseModule):
+    arch_settings = {
+        'P4S': [[32, 64, 128, 256]],
+        'P4M': [[64, 96, 160, 320]],
+        'P4B': [[64, 128, 192, 320]],
+        'P5': [[64, 128, 256, 512]]
+    }
+
+    def __init__(self,
+                 arch="P4S",
+                 widen_factor=1,
+                 head_type="S",
+                 base_chans=[64, 128, 256, 512],
+                 freeze_all=False,
+                 use_adapter_conv=True,
+                 multicat=False,
+                 norm_cfg=dict(type='BN'),
+                 act_cfg=dict(type='ReLU'),
+                 init_cfg=None):
+        super(FEINetUpHeadv2, self).__init__(init_cfg)
         self.freeze_all = freeze_all
         arch_setting = self.arch_settings[arch]
         in_channels = [int(in_channel * widen_factor) for in_channel in arch_setting[0]]
