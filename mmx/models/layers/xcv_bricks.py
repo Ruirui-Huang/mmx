@@ -426,3 +426,378 @@ class AttentionBlock(BaseModule):
         else:
             x = _inner_forward(x)
         return x
+
+class BottleRep(nn.Module):
+    """Bottle Rep Block.
+
+    Args:
+        in_channels (int): Number of channels in the input image
+        out_channels (int): Number of channels produced by the convolution
+        block_cfg (dict): Config dict for the block used to build each
+            layer. Defaults to dict(type='RepVGGBlock').
+        adaptive_weight (bool): Add adaptive_weight when forward calculate.
+            Defaults False.
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        middle_ratio: float = 1,
+        block_cfg: ConfigType = dict(type='RepVGGBlock'),
+        conv2_cfg: ConfigType = None,
+        adaptive_weight: bool = False,
+    ):
+        super().__init__()
+        conv1_cfg = block_cfg.copy()
+        if conv2_cfg is None:
+            conv2_cfg = block_cfg.copy()
+        middle_channels = int(out_channels * middle_ratio)  # hidden channels
+
+        conv1_cfg.update(
+            dict(in_channels=in_channels, out_channels=middle_channels))
+        conv2_cfg.update(
+            dict(in_channels=middle_channels, out_channels=out_channels))
+
+        self.conv1 = MODELS.build(conv1_cfg)
+        self.conv2 = MODELS.build(conv2_cfg)
+
+        if in_channels != out_channels:
+            self.shortcut = False
+        else:
+            self.shortcut = True
+        if adaptive_weight:
+            self.alpha = nn.Parameter(torch.ones(1))
+        else:
+            self.alpha = 1.0
+
+    def forward(self, x: Tensor) -> Tensor:
+        outputs = self.conv1(x)
+        outputs = self.conv2(outputs)
+        return outputs + self.alpha * x if self.shortcut else outputs
+    
+class RepNCSP(BaseModule):
+    # CSP Bottleneck with 3 convolutions
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            num_blocks=1,
+            expand_ratio: float = 0.5,
+            groups: int = 1,
+            norm_cfg: ConfigType = dict(type='BN', momentum=0.03, eps=0.001),
+            act_cfg: ConfigType = dict(type='SiLU', inplace=True),
+    ):
+        super().__init__()
+        mid_channels = int(out_channels * expand_ratio)  # hidden channels
+        self.conv1 = ConvModule(
+            in_channels,
+            mid_channels,
+            kernel_size=1,
+            stride=1,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg,
+        )
+        self.conv2 = ConvModule(
+            in_channels,
+            mid_channels,
+            kernel_size=1,
+            stride=1,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg,
+        )
+        self.conv3 = ConvModule(
+            2 * mid_channels,
+            out_channels,
+            kernel_size=1,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg,
+        )
+        block_cfg = dict(
+            type='mmyolo.RepVGGBlock',
+            groups=groups,
+            use_bn_first=False,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg,
+        )
+        conv2_cfg = dict(
+            type='ConvModule',
+            kernel_size=3,
+            padding=1,
+            groups=groups,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg,
+        )
+        self.block = nn.Sequential(*(BottleRep(
+            mid_channels,
+            mid_channels,
+            middle_ratio=1.0,
+            block_cfg=block_cfg,
+            conv2_cfg=conv2_cfg,
+        ) for _ in range(num_blocks)))
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.conv3(
+            torch.cat((self.block(self.conv1(x)), self.conv2(x)), 1))
+
+
+@MODELS.register_module()
+class RepNCSPELAN4(BaseModule):
+
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        mid_channels,
+        num_blocks=1,
+        norm_cfg: ConfigType = dict(type='BN', momentum=0.03, eps=0.001),
+        act_cfg: ConfigType = dict(type='SiLU', inplace=True),
+    ):  # ch_in, ch_out, number, shortcut, groups, expansion
+        super().__init__()
+        self.split_channels = mid_channels // 2
+        self.conv1 = ConvModule(
+            in_channels,
+            mid_channels,
+            1,
+            1,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg)
+        self.conv2 = nn.Sequential(
+            RepNCSP(
+                self.split_channels,
+                self.split_channels,
+                num_blocks,
+                norm_cfg=norm_cfg,
+                act_cfg=act_cfg,
+            ),
+            ConvModule(
+                self.split_channels,
+                self.split_channels,
+                3,
+                1,
+                padding=1,
+                norm_cfg=norm_cfg,
+                act_cfg=act_cfg,
+            ),
+        )
+        self.conv3 = nn.Sequential(
+            RepNCSP(
+                self.split_channels,
+                self.split_channels,
+                num_blocks,
+                norm_cfg=norm_cfg,
+                act_cfg=act_cfg,
+            ),
+            ConvModule(
+                self.split_channels,
+                self.split_channels,
+                3,
+                1,
+                padding=1,
+                norm_cfg=norm_cfg,
+                act_cfg=act_cfg,
+            ),
+        )
+        self.conv4 = ConvModule(
+            2 * mid_channels,
+            out_channels,
+            1,
+            1,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg,
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        y = list(self.conv1(x).chunk(2, 1))
+        y.extend((m(y[-1])) for m in [self.conv2, self.conv3])
+        return self.conv4(torch.cat(y, 1))
+
+    def forward_split(self, x: Tensor) -> Tensor:
+        y = list(
+            self.conv1(x).split((self.split_channels, self.split_channels), 1))
+        y.extend(m(y[-1]) for m in [self.conv2, self.conv3])
+        return self.conv4(torch.cat(y, 1))
+
+
+@MODELS.register_module()
+class ADown(BaseModule):
+
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            norm_cfg: ConfigType = dict(type='BN', momentum=0.03, eps=0.001),
+            act_cfg: ConfigType = dict(type='SiLU', inplace=True),
+    ):
+        super().__init__()
+        self.conv1 = ConvModule(
+            in_channels // 2,
+            out_channels // 2,
+            3,
+            2,
+            1,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg,
+        )
+        self.conv2 = ConvModule(
+            in_channels // 2,
+            out_channels // 2,
+            1,
+            1,
+            0,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg,
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = torch.nn.functional.avg_pool2d(x, 2, 1, 0, False, True)
+        x1, x2 = x.chunk(2, 1)
+        x1 = self.conv1(x1)
+        x2 = torch.nn.functional.max_pool2d(x2, 3, 2, 1)
+        x2 = self.conv2(x2)
+        return torch.cat((x1, x2), 1)
+
+
+def autopad(kernel, padding=None, dilation=1):
+    # Pad to 'same' shape outputs
+    if dilation > 1:
+        if isinstance(kernel, int):
+            kernel = dilation * (kernel - 1) + 1
+        else:
+            kernel = [dilation * (x - 1) + 1 for x in kernel]
+    if padding is None:
+        if isinstance(kernel, int):
+            padding = kernel // 2
+        else:
+            padding = [x // 2 for x in kernel]
+    return padding
+
+
+class CBLinear(nn.Module):
+
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: Tuple[int],
+        kernel_size: Union[int, Tuple[int, int]] = 1,
+        stride: Union[int, Tuple[int, int]] = 1,
+        padding: Union[int, Tuple[int, int]] = None,
+        groups: int = 1,
+    ):
+        super().__init__()
+        self.out_channels = out_channels
+        new_padding = autopad(kernel_size, padding, stride)
+        self.conv = nn.Conv2d(
+            in_channels,
+            sum(out_channels),
+            kernel_size,
+            stride,
+            new_padding,
+            groups=groups,
+            bias=True,
+        )
+
+    def forward(self, x: torch.Tensor):
+        outs = self.conv(x).split(self.out_channels, dim=1)
+        return outs
+
+
+class CBFuse(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, xs: Sequence[torch.Tensor]):
+        target_size = xs[-1].shape[2:]
+        res = [
+            F.interpolate(x, size=target_size, mode='nearest') for x in xs[:-1]
+        ]
+        out = torch.sum(torch.stack(res + xs[-1:]), dim=0)
+        return out
+
+
+@MODELS.register_module()
+class ELAN1(nn.Module):
+
+    def __init__(
+            self,
+            in_channels,
+            out_channels,
+            mid_channels,
+            norm_cfg: ConfigType = dict(type='BN', momentum=0.03, eps=0.001),
+            act_cfg: ConfigType = dict(type='SiLU', inplace=True),
+    ):
+        super().__init__()
+        self.harf_mid_channels = mid_channels // 2
+        self.conv1 = ConvModule(
+            in_channels,
+            mid_channels,
+            1,
+            1,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg)
+        self.conv2 = ConvModule(
+            self.harf_mid_channels,
+            self.harf_mid_channels,
+            3,
+            1,
+            1,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg,
+        )
+        self.conv3 = ConvModule(
+            self.harf_mid_channels,
+            self.harf_mid_channels,
+            3,
+            1,
+            1,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg,
+        )
+        self.conv4 = ConvModule(
+            mid_channels * 2,
+            out_channels,
+            1,
+            1,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg,
+        )
+
+    def forward(self, x):
+        y = list(self.conv1(x).chunk(2, 1))
+        y.extend(m(y[-1]) for m in [self.conv2, self.conv3])
+        return self.conv4(torch.cat(y, 1))
+
+    def forward_split(self, x):
+        y = list(
+            self.conv1(x).split(
+                (self.harf_mid_channels, self.harf_mid_channels), 1))
+        y.extend(m(y[-1]) for m in [self.conv2, self.conv3])
+        return self.conv4(torch.cat(y, 1))
+
+
+@MODELS.register_module()
+class AConv(nn.Module):
+
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            norm_cfg: ConfigType = dict(type='BN', momentum=0.03, eps=0.001),
+            act_cfg: ConfigType = dict(type='SiLU', inplace=True),
+    ):
+
+        super().__init__()
+        self.conv1 = ConvModule(
+            in_channels,
+            out_channels,
+            3,
+            2,
+            1,
+            norm_cfg=norm_cfg,
+            act_cfg=act_cfg,
+        )
+
+    def forward(self, x):
+        x = torch.nn.functional.avg_pool2d(x, 2, 1, 0, False, True)
+        return self.conv1(x)
