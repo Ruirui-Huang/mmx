@@ -6,6 +6,7 @@ from mmseg.models.decode_heads import PSPHead
 from mmseg.models.utils import resize
 from mmx.registry import MODELS
 import numpy as np
+from ..utils import DeconvModule
 
 
 class AdaptiveAvgPool2d(nn.Module):
@@ -29,8 +30,8 @@ class AdaptiveAvgPool2d(nn.Module):
         kernel_size = np.array(x.shape[-2:]) - (self.output_size - 1)*stride_size
         avg = nn.AvgPool2d(kernel_size=list(kernel_size), stride=list(stride_size))
         x = avg(x)
-        return x 
-    
+        return x
+
 class PPM(nn.ModuleList):
     """Pooling Pyramid Module used in PSPNet.
 
@@ -55,8 +56,9 @@ class PPM(nn.ModuleList):
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.act_cfg = act_cfg
+        self.adaptive_layers = nn.ModuleList()
         for pool_scale in pool_scales:
-            self.append(
+            self.adaptive_layers.append(
                 nn.Sequential(
                     AdaptiveAvgPool2d(pool_scale),
                     ConvModule(
@@ -66,21 +68,32 @@ class PPM(nn.ModuleList):
                         conv_cfg=self.conv_cfg,
                         norm_cfg=self.norm_cfg,
                         act_cfg=self.act_cfg,
-                        **kwargs)),
-                    
+                        **kwargs),
+                    DeconvModule(
+                        in_channels=self.channels,
+                        out_channels=self.channels,
+                        groups=1,
+                        norm_cfg=self.norm_cfg,
+                        act_cfg=self.act_cfg,
+                        scale_factor=int(16/pool_scale),
+                        kernel_size=int(16/pool_scale))
+                )
             )
             
     def forward(self, x):
         """Forward function."""
         ppm_outs = []
-        for ppm in self:
+        # for ppm in self:
+        #     ppm_out = ppm(x)
+        #     upsampled_ppm_out = resize(
+        #         ppm_out,
+        #         size=x.size()[2:],
+        #         mode='bilinear',
+        #         align_corners=self.align_corners)
+        #     ppm_outs.append(upsampled_ppm_out)
+        for ppm in self.adaptive_layers:
             ppm_out = ppm(x)
-            upsampled_ppm_out = resize(
-                ppm_out,
-                size=x.size()[2:],
-                mode='bilinear',
-                align_corners=self.align_corners)
-            ppm_outs.append(upsampled_ppm_out)
+            ppm_outs.append(ppm_out)
         return ppm_outs
 
 
@@ -116,3 +129,29 @@ class DetPSPHead(PSPHead):
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg)
+        self.up = nn.ConvTranspose2d(
+            self.channels,
+            self.num_classes,                                   
+            kernel_size=16,
+            stride=16)
+    def _forward_feature(self, inputs):
+        """Forward function for feature maps before classifying each pixel with
+        ``self.cls_seg`` fc.
+
+        Args:
+            inputs (list[Tensor]): List of multi-level img features.
+
+        Returns:
+            feats (Tensor): A tensor of shape (batch_size, self.channels,
+                H, W) which is feature map for last layer of decoder head.
+        """
+        if isinstance(self.in_index, (list, tuple)):
+            x = self._transform_inputs(inputs[-1])
+        else:
+            x = self._transform_inputs(inputs)
+        psp_outs = [x]
+        psp_outs.extend(self.psp_modules(x))
+        psp_outs = torch.cat(psp_outs, dim=1)
+        feats = self.bottleneck(psp_outs)
+        feats = self.up(feats)
+        return feats

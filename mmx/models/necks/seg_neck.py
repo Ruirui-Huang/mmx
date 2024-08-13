@@ -253,10 +253,8 @@ class FEINetUpHead(BaseModule):
 @MODELS.register_module()
 class FEINetUpHeadv2(BaseModule):
     arch_settings = {
-        'P4S': [[32, 64, 128, 256]],
-        'P4M': [[64, 96, 160, 320]],
-        'P4B': [[64, 128, 192, 320]],
-        'P5': [[64, 128, 256, 512]]
+        'P5': [[64, 128, 256, 512]],
+        'P9t': [[32, 64, 96, 128]]
     }
 
     def __init__(self,

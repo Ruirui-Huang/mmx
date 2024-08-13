@@ -23,13 +23,19 @@ class DetYOLOv9Backbone(BaseBackbone):
             ['mmx.AConv', 'mmx.RepNCSPELAN4', 96, 96, 96, 3,],  # out_indices=3, stage_idx=2
             ['mmx.AConv', 'mmx.RepNCSPELAN4', 128, 128, 128, 3,],  # out_indices=4, stage_idx=3
         ],
-        # 's': [
-        #     ['ConvModule', 'mmx.ELAN1', 64, 64, 64, -1],
-        #     ['mmx.AConv', 'mmx.RepNCSPELAN4', 128, 128, 128, 3],
-        #     ['mmx.AConv', 'mmx.RepNCSPELAN4', 192, 192, 192, 3],
-        #     ['mmx.AConv', 'mmx.RepNCSPELAN4', 256, 256, 256, 3],
-        # ],
+        't2': [
+            ['ConvModule', 'mmx.ELAN1', 32, 32, 32, -1,],  # out_indices=1, stage_idx=0
+            ['mmx.AConv', 'mmx.RepNCSPELAN4', 64, 64, 64, 2,],  # out_indices=2, stage_idx=1
+            ['mmx.AConv', 'mmx.RepNCSPELAN4', 96, 96, 96, 2,],  # out_indices=3, stage_idx=2
+            ['mmx.AConv', 'mmx.RepNCSPELAN4', 128, 128, 128, 2,],  # out_indices=4, stage_idx=3
+        ],
         's': [
+            ['ConvModule', 'mmx.ELAN1', 64, 64, 64, -1],
+            ['mmx.AConv', 'mmx.RepNCSPELAN4', 128, 128, 128, 3],
+            ['mmx.AConv', 'mmx.RepNCSPELAN4', 192, 192, 192, 3],
+            ['mmx.AConv', 'mmx.RepNCSPELAN4', 256, 256, 256, 3],
+        ],
+        's1': [
             ['ConvModule', 'mmx.ELAN1', 64, 64, 64, -1],
             ['mmx.AConv', 'mmx.RepNCSPELAN4', 64, 64, 64, 1],
             ['mmx.AConv', 'mmx.RepNCSPELAN4', 128, 128, 128, 1],
