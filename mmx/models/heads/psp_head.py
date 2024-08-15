@@ -131,7 +131,7 @@ class DetPSPHead(PSPHead):
             act_cfg=self.act_cfg)
         self.up = nn.ConvTranspose2d(
             self.channels,
-            self.num_classes,                                   
+            self.channels,                                
             kernel_size=16,
             stride=16)
     def _forward_feature(self, inputs):

@@ -1,3 +1,5 @@
+# fastfcn pspnet sem_fpn upernet
+
 METAINFO = dict(
         classes=("background", "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant","stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange","broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"),
         palette=[[0, 192, 64], [0, 192, 64], [0, 64, 96], [128, 192, 192], [0, 64, 64], [0, 192, 224], [0, 192, 192], [128, 192, 64], [0, 192, 96], [128, 192, 64], [128, 32, 192], [0, 0, 224], [0, 0, 64], [0, 160, 192], [128, 0, 96], [128, 0, 192],[0, 32, 192], [128, 128, 224], [0, 0, 192], [128, 160, 192], [128, 128, 0], [128, 0, 32], [128, 32, 0], [128, 0, 128], [64, 128, 32], [0, 160, 0], [0, 0, 0], [192, 128, 160], [0, 32, 0], [0, 128, 128], [64, 128, 160], [128, 160, 0], [0, 128, 0], [192, 128, 32], [128, 96, 128], [0, 0, 128], [64, 0, 32], [0, 224, 128], [128, 0, 0], [192, 0, 160],[0, 96, 128], [128, 128, 128], [64, 0, 160], [128, 224, 128], [128, 128, 64], [192, 0, 32], [128, 96, 0], [128, 0, 192], [0, 128, 32], [64, 224, 0], [0, 0, 64], [128, 128, 160], [64, 96, 0], [0, 128, 192], [0, 128, 160], [192, 224, 0], [0, 128, 64], [128, 128, 32], [192, 32, 128], [0, 64, 192], [0, 0, 32], [64, 160, 128], [128, 64, 64], [128, 0, 160], [64, 32, 128], [128, 192, 192], [0, 0, 160], [192, 160, 128], [128, 192, 0], [128, 0, 96], [192, 32, 0], [128, 64, 128], [64, 128, 96], [64, 160, 0], [0, 64, 0], [192, 128, 224], [64, 32, 0], [0, 192, 128], [64, 128, 224], [192, 160, 0]])
@@ -6,9 +8,9 @@ _base_ = [
     '../_base_/runtime_mmseg.py'
 ]
 
-input_size = (512, 512)
+input_size = (256, 256)
 base_lr = 0.01
-val_interval = 2
+val_interval = 1
 max_epochs = 20
 train_batch_size = 2
 train_num_workers = 2
@@ -22,7 +24,7 @@ num_classes = len(METAINFO['classes'])
 # dataset settings
 dataset_type = 'BaseSegDataset'
 data_root = 'D:/Data_pub/00_coco2017/'
-run_name = 'v9_psp'
+run_name = 'v9_fpn'
 work_dir = 'D:/models/03_OS/Coco/' + run_name
 pretrained = None
 
@@ -101,62 +103,34 @@ norm_cfg = dict(type='BN', requires_grad=True)
 act_cfg = dict(type='ReLU', inplace=True)
 
 model = dict(
-    type='mmx.EncoderDecoder',
+    type='EncoderDecoder',
     data_preprocessor=data_preprocessor,
-    pretrained=pretrained,
+    pretrained=None,
     backbone=dict(
-        type='mmx.DetYOLOv9Backbone',
-        arch='t',
-        stem_channels=64,
+        type='mmyolo.YOLOv5CSPDarknet',
+        arch='P5',
+        deepen_factor=0.33,
+        widen_factor=0.25,
         out_indices=(1, 2, 3, 4),
         norm_cfg=norm_cfg,
         act_cfg=act_cfg),
+    neck=dict(
+        type='mmx.DetFPN',
+        in_channels=[32, 64, 128, 256],
+        out_channels=128,
+        num_outs=4),
     decode_head=dict(
-        type='mmx.DetPSPHead',
-        in_channels=128,
-        in_index=-1,
+        type='mmx.DetFPNHead',
+        in_channels=[128, 128, 128, 128],
+        in_index=[0, 1, 2, 3],
+        feature_strides=[4, 8, 16, 32],
         channels=128,
-        pool_scales=(1, 2, 4, 8),
         dropout_ratio=0.1,
         num_classes=num_classes,
         norm_cfg=norm_cfg,
         align_corners=False,
-        loss_decode=[
-            dict(
-                type='CrossEntropyLoss',
-                loss_name='loss_ce',
-                use_sigmoid=False,
-                loss_weight=0.4,
-                avg_non_ignore=True),
-            dict(
-                type='LovaszLoss',
-                loss_name='loss_lovasz',
-                reduction='none',
-                loss_type='multi_class',
-                loss_weight=0.6)
-        ]),
-    auxiliary_head=dict(
-        type='STDCHead',
-        in_channels=96,
-        in_index=2,
-        channels=64,
-        kernel_size=3,
-        num_convs=1,
-        concat_input=False,
-        boundary_threshold=0.1,
-        num_classes=2,
-        norm_cfg=norm_cfg,
-        act_cfg=act_cfg,
-        align_corners=False,
-        loss_decode=[
-            dict(
-                type='CrossEntropyLoss',
-                loss_name='loss_ce',
-                use_sigmoid=True,
-                loss_weight=0.4,
-                avg_non_ignore=True),
-            dict(type='DiceLoss', loss_name='loss_dice', loss_weight=0.1)
-        ]),
+        loss_decode=dict(
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)),
     # model training and testing settings
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
