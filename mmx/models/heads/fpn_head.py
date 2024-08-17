@@ -57,6 +57,15 @@ class DetFPNHead(BaseDecodeHead):
                     )
             self.scale_heads.append(nn.Sequential(*scale_head))
 
+        self.up = DeconvModule(
+                    in_channels=self.channels,
+                    out_channels=self.channels,
+                    groups=1,
+                    norm_cfg=self.norm_cfg,
+                    act_cfg=self.act_cfg,
+                    scale_factor=4,
+                    kernel_size=4)
+
     def forward(self, inputs):
 
         x = self._transform_inputs(inputs)
@@ -70,6 +79,6 @@ class DetFPNHead(BaseDecodeHead):
             #     size=output.shape[2:],
             #     mode='bilinear',
             #     align_corners=self.align_corners)
-
+        output = self.up(output)
         output = self.cls_seg(output)
         return output

@@ -158,14 +158,13 @@ class DetFPN(BaseModule):
                     act_cfg=act_cfg,
                     inplace=False)
                 self.fpn_convs.append(extra_fpn_conv)
-        self.up = DeconvModule(
-                    in_channels=out_channels,
-                    out_channels=out_channels,
-                    groups=1,
-                    norm_cfg=norm_cfg,
-                    act_cfg=act_cfg,
-                    scale_factor=2,
-                    kernel_size=2)
+                
+        self.up = nn.ConvTranspose2d(
+            out_channels,
+            out_channels,                                
+            kernel_size=2,
+            stride=2)
+    
     def forward(self, inputs):
         assert len(inputs) == len(self.in_channels)
 

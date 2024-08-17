@@ -129,11 +129,15 @@ class DetPSPHead(PSPHead):
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg)
-        self.up = nn.ConvTranspose2d(
-            self.channels,
-            self.channels,                                
-            kernel_size=16,
-            stride=16)
+        
+        self.up = DeconvModule(
+                    in_channels=self.channels,
+                    out_channels=self.channels,
+                    groups=1,
+                    norm_cfg=self.norm_cfg,
+                    act_cfg=self.act_cfg,
+                    scale_factor=32,
+                    kernel_size=32)
     def _forward_feature(self, inputs):
         """Forward function for feature maps before classifying each pixel with
         ``self.cls_seg`` fc.

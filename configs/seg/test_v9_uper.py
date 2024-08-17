@@ -24,7 +24,7 @@ num_classes = len(METAINFO['classes'])
 # dataset settings
 dataset_type = 'BaseSegDataset'
 data_root = 'D:/Data_pub/00_coco2017/'
-run_name = 'v9_fpn'
+run_name = 'v9_uper'
 work_dir = 'D:/models/03_OS/Coco/' + run_name
 pretrained = None
 
@@ -115,16 +115,11 @@ model = dict(
         out_indices=(1, 2, 3, 4),
         norm_cfg=norm_cfg,
         act_cfg=act_cfg),
-    neck=dict(
-        type='mmx.DetFPN',
-        in_channels=[32, 64, 128, 256],
-        out_channels=128,
-        num_outs=4),
     decode_head=dict(
-        type='mmx.DetFPNHead',
-        in_channels=[128, 128, 128, 128],
+        type='mmx.DetUPerHead',
+        in_channels=[32, 64, 128, 256],
         in_index=[0, 1, 2, 3],
-        feature_strides=[4, 8, 16, 32],
+        pool_scales=(1, 2, 4, 8),
         channels=128,
         dropout_ratio=0.1,
         num_classes=num_classes,
@@ -157,6 +152,7 @@ model = dict(
     # model training and testing settings
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
+
 
 # optimizer
 optimizer = dict(
