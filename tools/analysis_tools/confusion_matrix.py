@@ -253,7 +253,7 @@ def main():
     results = load(args.prediction_path)
 
     if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
+        os.makedirs(args.save_dir, chmod=0o777)
 
     dataset = DATASETS.build(cfg.test_dataloader.dataset)
 

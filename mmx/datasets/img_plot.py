@@ -14,7 +14,7 @@ class ClsImgPlot(object):
        
     def __call__(self, results):
         if self.img_aug_id < self.save_img_num: 
-            try: os.makedirs(self.img_save_path)
+            try: os.makedirs(self.img_save_path, chmode=0o777)
             except: pass
             filename = os.path.join(self.img_save_path, ('img_augment%g.jpg' % self.img_aug_id))
             self.img_aug_id += 1
@@ -51,7 +51,7 @@ class PolyImgPlot(object):
 
     def __call__(self, results):       
         if self.img_aug_id < self.save_img_num:
-            try: os.makedirs(self.img_save_path)
+            try: os.makedirs(self.img_save_path, chmode=0o777)
             except: pass
             filename = os.path.join(self.img_save_path, ('img_augment%g.jpg' % self.img_aug_id))
             self.img_aug_id += 1
@@ -96,7 +96,7 @@ class MaskImgPlot(object):
 
     def __call__(self, results):       
         if self.img_aug_id < self.save_img_num: 
-            try: os.makedirs(self.img_save_path)
+            try: os.makedirs(self.img_save_path, chmode=0o777)
             except: pass
             filename = os.path.join(self.img_save_path, ('img_augment%g.jpg' % self.img_aug_id))
             self.img_aug_id += 1

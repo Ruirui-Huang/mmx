@@ -75,7 +75,7 @@ def show_bbox_num(cfg, out_dir, fig_set, class_name, class_num):
 
     # Save figure
     if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
+        os.makedirs(out_dir, chmode=0o777)
     out_name = fig_set['out_name']
     fig.savefig(
         f'{out_dir}/{out_name}_bbox_num.jpg',
@@ -165,7 +165,7 @@ def show_bbox_wh(out_dir, fig_set, class_bbox_w, class_bbox_h, class_name):
 
     # Save figure
     if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
+        os.makedirs(out_dir, chmode=0o777)
     out_name = fig_set['out_name']
     fig.savefig(
         f'{out_dir}/{out_name}_bbox_wh.jpg',
@@ -224,7 +224,7 @@ def show_bbox_wh_ratio(out_dir, fig_set, class_name, class_bbox_ratio):
 
     # Save figure
     if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
+        os.makedirs(out_dir, chmode=0o777)
     out_name = fig_set['out_name']
     fig.savefig(
         f'{out_dir}/{out_name}_bbox_ratio.jpg',
@@ -284,7 +284,7 @@ def show_bbox_area(out_dir, fig_set, area_rule, class_name, bbox_area_num):
 
     # Save figure
     if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
+        os.makedirs(out_dir, chmode=0o777)
     out_name = fig_set['out_name']
     fig.savefig(
         f'{out_dir}/{out_name}_bbox_area.jpg',
