@@ -7,7 +7,7 @@ _base_ = [
 ]
 
 input_size = (512, 512)
-base_lr = 0.01
+base_lr = 0.001
 val_interval = 2
 max_epochs = 20
 train_batch_size = 2
@@ -179,10 +179,10 @@ model = dict(
 
 # optimizer
 optimizer = dict(
-    type='SGD', 
+    type='AdamW', 
     lr=base_lr, 
-    momentum=0.9, 
-    weight_decay=0.0005)
+    betas=(0.9, 0.999), 
+    weight_decay=0.05)
 
 optim_wrapper = dict(
     type='AmpOptimWrapper', optimizer=optimizer, 
@@ -191,21 +191,28 @@ optim_wrapper = dict(
 # learning policy
 param_scheduler = [
     dict(
-        type='PolyLR',
-        eta_min=1e-4,
-        power=0.9,
+        type='LinearLR',
+        start_factor=0.01,
         begin=0,
-        end=2,
-        by_epoch=False)
+        end=5,
+        by_epoch=True),
+    dict(
+        type='PolyLR',
+        eta_min=0.0,
+        power=0.9,
+        begin=5,
+        end=max_epochs,
+        by_epoch=True)
 ]
 # training schedule for 20k
-train_cfg = dict(type='IterBasedTrainLoop', max_iters=20, val_interval=2)
+train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=max_epochs, val_interval=2, dynamic_intervals=[(max_epochs-intervals, 1)])
 val_cfg = dict(type='ValLoop')
 test_cfg = dict(type='TestLoop')
+auto_scale_lr = dict(base_batch_size=train_batch_size_pre_gpu*32)
 default_hooks = dict(
     timer=dict(type='IterTimerHook'),
-    logger=dict(type='LoggerHook', interval=2, log_metric_by_epoch=False),
+    logger=dict(type='LoggerHook', interval=2, log_metric_by_epoch=True),
     param_scheduler=dict(type='ParamSchedulerHook'),
-    checkpoint=dict(type='CheckpointHook', by_epoch=False, interval=2),
+    checkpoint=dict(type='CheckpointHook', by_epoch=True, interval=2, save_base='mIoU', max_keep_ckpts=1),
     sampler_seed=dict(type='DistSamplerSeedHook'),
     visualization=dict(type='SegVisualizationHook'))
